@@ -1,92 +1,51 @@
 /*
- * Внешний датчик температуры.
- * Передает четыре байта. Первый байт - зарезервирован для будущего использования, второй байт - тип датчика, пока только 0x01 - датчик температуры на ATTiny13
- * И последние два байта температуры полученных из DS18B20. Если нет датчика температуры то передается SENSOR_NO = (0xfa00) - значение температуры выходящие за предел измерения ds18b20
- * Ожидает в ответ длительность периода засыпания. Длительность периода передается в виде трех
- * байт. Первый байт это значение прескаллера для таймера WDT
- * Второй и третий байты это счетчик срабатываний таймера WDT. Младший байт счетчика передается вперед.
- * Если передача не удалась то используется период засыпания по умолчанию
- * Пример кода на приемнике:
- * 		BufTx[0] = ATTINY_13A_8S_SLEEP;		//Команда для таймера сна, заснуть на 8 секунд
- *		BufTx[1] = 0x00;					//Старший байт счетчика сна
- *		BufTx[2] = 0x01;					//Младший байт счетчика
- *		nRF_cmd_Write(nRF_W_ACK_PAYLOAD_MASK | 0b00000000, BUF_LEN, BufTx);	//Записать ответ для канала 0
- * Andy Korg (c) v.0.1 2014 г.
- * http://radiokot.ru/circuit/digital/home/199/
+ * external sensors - temperature or mht-z19
+ * data transmission over the radio channel to nRF24L01+
+ * the temperature sensor is battery powered, so the temperature transfer over a long period.
+ * The air sensor is powered by the pump, therefore, the requirements for the consumption mode are simplified.
  */ 
 
-
 #include <avr/io.h>
-#include <util/delay.h>
-#include <avr/interrupt.h>
 #include <avr/wdt.h>
-#include "ds18b20.h"
-#include "avr/sleep.h"
-#include "nRF24L01P.h"
+#include <avr/xmega.h>
 
-#define SLEEP_WDT_S			8										//Интервал сна таймера WDT
-#define SLEEP_PERIOD_10MIN	((10*60)/SLEEP_WDT_S)					//Количество срабатываний WDT для интервала сна 10 минут
-#define ATTEMPT_SEND_MAX	10										//Максимальное количество попыток передачи
+#include "HAL.h"
+#include "one_wire.h"
 
-#define	WDT_int_on()		WDTCR |= Bit(WDCE) | Bit(WDTIE)			//Включить прерывания от собаки
+static uint8_t device_present = 0;
 
-/************************************************************************/
-/* Прерывания от собаки, просто заглушка что бы при просыпании			*/
-/*   не уходило на reset												*/
-/************************************************************************/
-ISR(WDT_vect){
+bool sensor_answer(uint8_t *value){
+	PORTB.OUTCLR = PIN3_bm;
+	PORTB.OUTSET = PIN3_bm;
+	if (*value){
+		PORTB.OUTCLR = PIN2_bm;
+		device_present = 1;
+	}
+	return true;
+}
+
+bool sensor_send(uint8_t *value){
+	return true;
 }
 
 int main(void)
 {
-	u08 Attempt = ATTEMPT_SEND_MAX;
-	u16 Tempr, Tempr1;
-	struct nRF_Response nRF_Answer;
+	//wdt_enable(WDT_PERIOD_1KCLK_gc);
 
-	PRR = (1<<PRTIM0) | (1<<PRADC);									//Выключить таймер и АЦП для экономии электричества
-	wdt_reset();													//Сброс watchdog
-	sei();
+	PORTB.DIRSET = PIN3_bm;
+	PORTB.DIRSET = PIN2_bm;
+	PORTB.OUTSET = PIN2_bm;
+
+	PORTB.OUTCLR = PIN3_bm;
+	PORTB.OUTSET = PIN3_bm;
 	
-	nRF_Init();
-
-    while(1){
-		
-		_delay_us(10);
-		Tempr1 = SENSOR_NO;
-		Tempr = GetTemperature();
-		if (Tempr != SENSOR_NO)										//Что-то прочиталось, уточняем
-			Tempr1 = GetTemperature();
-		if (Tempr != Tempr1){										//Не совпадают значения, требуется прочитать еще раз
-			if (Tempr != GetTemperature()){							//Значения с первой попыткой не совпали, сравниваем со второй
-				if (Tempr1 == GetTemperature()){					//Со второй совпали, считаем ее верной
-					Tempr = Tempr1;
-				}
-			}
-		}
-		if (!nRF_Send(Tempr, &nRF_Answer)){							//Хост не ответил
-			Attempt--;												//Минус одна попытка
-			if (Attempt==0){										//Попытки передачи исчерпаны, переходим на 10 минутный интервал передачи
-				nRF_Answer.Cmd = SLEEP_WDT_S;
-				nRF_Answer.Data = SLEEP_PERIOD_10MIN;
-			}
-			else{													//Попытки еще не исчерпаны попытаемся через 1 секунду
-				nRF_Answer.Cmd = ATTINY_13A_1S_SLEEP;
-				nRF_Answer.Data = SLEEP_PERIOD_10MIN;
-			}
-		}
-		else
-			Attempt = ATTEMPT_SEND_MAX;
-						
-
-		set_sleep_mode(SLEEP_MODE_PWR_DOWN);						//Режим глубокого сна - просыпается только от собаки или низкого уровня на INT0
-		WDTCR |= Bit(WDCE) | (nRF_Answer.Cmd & ((1<<WDP3) | (1<<WDP2) | (1<<WDP1) | (1<<WDP0)));	//Команда засыпания
-		for (u08 CountSleep = nRF_Answer.Data; CountSleep; CountSleep--){	//Спим
-			PORTB = 0;
-			PORTB = 0xff;											//Подтянуть к питанию для экономии энергии
-			WDT_int_on();
-			sleep_enable();
-			sleep_cpu();
-			sleep_disable();										//Проснулись -------------------------
+	OneWareIni();
+	sei();
+    OneWareReset(sensor_answer);
+    while (1){
+		if (device_present){
+			OneWareSendByte(0x33, sensor_send);
 		}
     }
 }
+
