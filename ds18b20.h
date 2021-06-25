@@ -1,17 +1,15 @@
 /*
- * Чтение температуры из датчика ds18b20
- * ver 1.0
- */ 
+\brief Reading temperature from ds18b20 sensor
+*/
 
 
 #ifndef DS18B20_H_
 #define DS18B20_H_
 
-#include "avrlibtypes.h"
+#include <stdint.h>
 
-#define SENSOR_NO	0xfa00				//Датчик не найден или не отвечает. Выбрано значение заведомо невозможной температуры
+#define SENSOR_NO	0xfa00				//Sensor not found or not responding. A known impossible temperature value has been selected.
 
-u16 GetTemperature(void);				//Возвращает значение температуры или отсутствие датчика.
-										//Если старший бит возвращаемого значения равен 1, то это отрицательная температура в дополнительном коде.
+uint16_t GetTemperature(uint8_t attempt);			//returns the two's complement temperature value
 
 #endif /* DS18B20_H_ */
