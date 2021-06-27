@@ -20,6 +20,7 @@
 #include <avr/interrupt.h>
 #include <avr/wdt.h>
 #include "ds18b20.h"
+#include "nRF24L01P.h"
 #include "avr/sleep.h"
 
 
@@ -30,7 +31,7 @@
 #define	WDT_int_on()		WDTCR |= Bit(WDCE) | Bit(WDTIE)			//Включить прерывания от собаки
 
 //ISR(wdt_reset){
-	//Interrupts from the watchdog timer, just a stub so that when you wake up, it does not go to reset
+//Interrupts from the watchdog timer, just a stub so that when you wake up, it does not go to reset
 //}
 
 int main(void)
@@ -38,11 +39,11 @@ int main(void)
 	uint8_t Attempt = ATTEMPT_SEND_MAX;
 	uint16_t Tempr;
 	
-PORTB.DIRSET = PIN3_bm;	
-PORTB.DIRSET = PIN2_bm;
-PORTB.OUTCLR = PIN2_bm;
-PORTB.OUTSET = PIN2_bm;
-	//struct nRF_Response nRF_Answer;
+	PORTB.DIRSET = PIN3_bm;
+	PORTB.DIRSET = PIN2_bm;
+	PORTB.OUTCLR = PIN2_bm;
+	PORTB.OUTSET = PIN2_bm;
+	struct nRF_Response nRF_Answer;
 
 	//	PRR = (1<<PRTIM0) | (1<<PRADC);									//Выключить таймер и АЦП для экономии электричества
 	//	wdt_reset();													//Сброс watchdog
@@ -53,28 +54,25 @@ PORTB.OUTSET = PIN2_bm;
 	while(1){
 		
 		Tempr = GetTemperature(Attempt);
-PORTB.OUTCLR = PIN2_bm;
-PORTB.OUTSET = PIN2_bm;
 		if (Tempr != SENSOR_NO){
-PORTB.OUTCLR = PIN3_bm;
-PORTB.OUTSET = PIN3_bm;
+			PORTB.OUTCLR = PIN3_bm;
+			PORTB.OUTSET = PIN3_bm;
 		}
-		/*
 		if (!nRF_Send(Tempr, &nRF_Answer)){							//Хост не ответил
-		Attempt--;												//Минус одна попытка
-		if (Attempt==0){										//Попытки передачи исчерпаны, переходим на 10 минутный интервал передачи
-		nRF_Answer.Cmd = SLEEP_WDT_S;
-		nRF_Answer.Data = SLEEP_PERIOD_10MIN;
-		}
-		else{													//Попытки еще не исчерпаны попытаемся через 1 секунду
-		nRF_Answer.Cmd = ATTINY_13A_1S_SLEEP;
-		nRF_Answer.Data = SLEEP_PERIOD_10MIN;
-		}
+			Attempt--;												//Минус одна попытка
+			if (Attempt==0){										//Попытки передачи исчерпаны, переходим на 10 минутный интервал передачи
+				nRF_Answer.Cmd = SLEEP_WDT_S;
+				nRF_Answer.Data = SLEEP_PERIOD_10MIN;
+			}
+			else{													//Попытки еще не исчерпаны попытаемся через 1 секунду
+				nRF_Answer.Cmd = 0;
+				nRF_Answer.Data = SLEEP_PERIOD_10MIN;
+			}
 		}
 		else
 		Attempt = ATTEMPT_SEND_MAX;
 		
-
+		/*
 		set_sleep_mode(SLEEP_MODE_PWR_DOWN);						//Режим глубокого сна - просыпается только от собаки или низкого уровня на INT0
 		WDTCR |= Bit(WDCE) | (nRF_Answer.Cmd & ((1<<WDP3) | (1<<WDP2) | (1<<WDP1) | (1<<WDP0)));	//Команда засыпания
 		for (u08 CountSleep = nRF_Answer.Data; CountSleep; CountSleep--){	//Спим

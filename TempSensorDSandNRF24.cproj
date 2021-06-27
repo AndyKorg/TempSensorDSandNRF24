@@ -145,6 +145,15 @@
     <Compile Include="HAL.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="nRF24L01P Reg.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="nRF24L01P.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="nRF24L01P.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="OneWare.c">
       <SubType>compile</SubType>
     </Compile>

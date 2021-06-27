@@ -45,7 +45,6 @@ uint16_t GetTemperature(uint8_t attempt){
 			crc_calc(OneWareReciveByte(), &crc);;//Byte 7 Reserved
 			uint8_t crc_ctrl = OneWareReciveByte();
 			OneWareReset();												//Remaining bytes are ignored
-_delay_ms(100);//DEBUG
 			if (crc == crc_ctrl){
 				return ( ((uint16_t)Hi<<8) | ((uint16_t)Lo) );
 			}
