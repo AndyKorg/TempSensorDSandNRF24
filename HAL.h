@@ -23,6 +23,13 @@
 #define DEBUG_PIN				PIN7_bm
 #endif
 
+//------------------ SEND (TEST) BUTTON -----------------------------------
+#define BUTTON_PORT				PORTC
+#define BUTTON_PIN				PIN0_bm
+#define BUTTON_INT				BUTTON_PORT.PIN0CTRL
+#define BUTTON_INT_TYPE			PORT_ISC_LEVEL_gc
+#define BUTTON_INT_VECT			PORTC_PORT_vect
+
 //------------------ ONE WIRE PORT -----------------------------------
 #define ONE_WIRE_PORT			PORTB
 #define ONE_WIRE_PIN			PIN4_bm

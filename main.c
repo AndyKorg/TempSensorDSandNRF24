@@ -16,6 +16,7 @@
 */
 
 
+#include <stddef.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/wdt.h>
@@ -34,6 +35,15 @@
 //Interrupts from the watchdog timer, just a stub so that when you wake up, it does not go to reset
 //}
 
+volatile static uint8_t mode = nrf_send;
+
+ISR(BUTTON_INT_VECT){
+	if (BUTTON_PORT.INTFLAGS & BUTTON_PIN){
+		mode = nrf_reg;
+		BUTTON_PORT.INTFLAGS |= BUTTON_PIN;
+	}
+}
+
 int main(void)
 {
 	uint8_t Attempt = ATTEMPT_SEND_MAX;
@@ -43,14 +53,18 @@ int main(void)
 	PORTB.DIRSET = PIN2_bm;
 	PORTB.OUTCLR = PIN2_bm;
 	PORTB.OUTSET = PIN2_bm;
-	struct nRF_Response nRF_Answer;
+	nrf_Response_t nRF_Answer;
 
+	BUTTON_PORT.DIRCLR = BUTTON_PIN;
+	BUTTON_INT = BUTTON_INT_TYPE | PORT_PULLUPEN_bm;
+	
 	//	PRR = (1<<PRTIM0) | (1<<PRADC);									//Выключить таймер и АЦП для экономии электричества
 	//	wdt_reset();													//Сброс watchdog
 	//	sei();
 	
 	//	nRF_Init();
 
+	mode = nrf_reg;
 	while(1){
 		
 		Tempr = GetTemperature(Attempt);
@@ -58,19 +72,33 @@ int main(void)
 			PORTB.OUTCLR = PIN3_bm;
 			PORTB.OUTSET = PIN3_bm;
 		}
-		if (!nRF_Send(Tempr, &nRF_Answer)){							//Хост не ответил
+		uint8_t buf[4];
+		buf[0] = DEVICE_TYPE_MH_Z19;
+		buf[1] = DEVICE_TYPE_MH_Z19;
+		buf[2] = (uint8_t)(Tempr>>8);
+		buf[3] = (uint8_t)Tempr;
+		nrf_err_t res = nRF_Send(mode, buf, 4, &nRF_Answer);
+		if (res != nRF_OK){					//error
+			if ((mode == nrf_reg) && (res == nRF_ERR_NO_REG_MODE) && nRF_real_address_is_set()){	//no reg mode and real address is set, send data
+				mode = nrf_send;	//return to normal mode
+				if (nRF_Send(nrf_send, buf, 4, &nRF_Answer) == nRF_OK){
+					continue;
+				}
+			}
 			Attempt--;												//Минус одна попытка
-			if (Attempt==0){										//Попытки передачи исчерпаны, переходим на 10 минутный интервал передачи
-				nRF_Answer.Cmd = SLEEP_WDT_S;
-				nRF_Answer.Data = SLEEP_PERIOD_10MIN;
+			/*			if (Attempt==0){										//Попытки передачи исчерпаны, переходим на 10 минутный интервал передачи
+			nRF_Answer.Cmd = SLEEP_WDT_S;
+			nRF_Answer.Data = SLEEP_PERIOD_10MIN;
 			}
 			else{													//Попытки еще не исчерпаны попытаемся через 1 секунду
-				nRF_Answer.Cmd = 0;
-				nRF_Answer.Data = SLEEP_PERIOD_10MIN;
+			nRF_Answer.Cmd = 0;
+			nRF_Answer.Data = SLEEP_PERIOD_10MIN;
 			}
+			*/
 		}
-		else
-		Attempt = ATTEMPT_SEND_MAX;
+		else {
+			Attempt = ATTEMPT_SEND_MAX;
+		}
 		
 		/*
 		set_sleep_mode(SLEEP_MODE_PWR_DOWN);						//Режим глубокого сна - просыпается только от собаки или низкого уровня на INT0
