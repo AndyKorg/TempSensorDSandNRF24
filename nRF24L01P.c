@@ -8,6 +8,8 @@ The third byte code of the controlling microcontroller
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <avr/eeprom.h>
+
 #include "nRF24L01P.h"
 
 #define ADDR_LEN 				5	//address lenght device, while fixed
@@ -54,7 +56,7 @@ typedef struct
 } address_t;
 
 static address_t real_address = {{PTX_REG_MODE_NULL_ADR}, stProcess};
-	
+
 
 /*
 \brief pipe and address register control pipe
@@ -131,8 +133,6 @@ nrf_err_t send(const uint8_t *adr, const uint8_t *data, const uint8_t len, nrf_R
 
 	uint8_t Buf[6], tmp;
 	nrf_err_t Ret = nRF_ERR_NO_ANSWER;
-	
-	nRF_Init();
 	
 	tmp = nRF_cmd_Write(nRF_FLUSH_RX, 0, NULL);				//clear FIFO buffers
 	if (tmp & (1<<nRF_0_ALLOWED)){	//module not responce
@@ -216,16 +216,18 @@ If received normally, the nRF_Resp structure is full
 */
 nrf_err_t nRF_Send(const nrf_oper_t oper, const uint8_t *data, const uint8_t len, nrf_Response_t *nRF_Resp){
 	
-	if (oper == nrf_reg){
+	if (oper == nrf_reg_mode){
 		//registartion mode - default address pip0
 		uint8_t reg_adr[ADDR_LEN] = REG_ADDRESS;
 		uint8_t reg_buf[PTX_REG_MODE_LEN*3];
 		reg_buf[PTX_REG_TYPE_BYTE] = nRF_TYPE_SENSOR;
 		reg_buf[PTX_REG_QUERY_NUM_BYTE] = PTX_REG_MODE_QUERY_0;
-		memcpy(reg_buf+PTX_REG_ADR_START_BYTE, real_address.adr, ADDR_LEN);
+		memcpy(reg_buf+PTX_REG_ADR_START_BYTE, real_address.adr, ADDR_LEN);	//send current address
 		uint8_t attempt = REG_ATTEMPT_MAX;
+		nrf_err_t ret;
 		while (attempt){
-			if (send(reg_adr, reg_buf, PTX_REG_MODE_LEN, nRF_Resp) == nRF_OK){
+			ret = send(reg_adr, reg_buf, PTX_REG_MODE_LEN, nRF_Resp);
+			if (ret == nRF_OK){
 				if (nRF_Resp->Len == PTX_REG_MODE_LEN){		//length correct
 					if ((*(nRF_Resp->Data+PTX_REG_TYPE_BYTE) == PTX_REG_MODE_NO_TYPE) && (*(nRF_Resp->Data+PTX_REG_QUERY_NUM_BYTE) == PTX_REG_MODE_QUERY_0)){
 						//white next query from PTX
@@ -237,17 +239,17 @@ nrf_err_t nRF_Send(const nrf_oper_t oper, const uint8_t *data, const uint8_t len
 						//answer address sensor
 						memcpy(real_address.adr, nRF_Resp->Data+PTX_REG_ADR_START_BYTE, ADDR_LEN);
 						real_address.state = stReal;
-						return nRF_OK;
+						eeprom_write_block(&real_address, (void*) nRF_EEPROM, sizeof(address_t));
 					}
-					else{
-						//not registration mode or another sensor is being registered
-						return nRF_ERR_NO_REG_MODE;
-					}
+					return nRF_OK;	//possible not registration mode or another sensor is being registered. check nRF_Resp
 				}
+			}
+			else if (ret == nRF_ERR_NO_MODULE){	//module not set. we will not try to transmit.
+				return ret;
 			}
 			attempt--;
 		}
-		return nRF_ERR_NO_ANSWER;
+		return ret;
 	}
 	//data send mode
 	if (!nRF_real_address_is_set()){
@@ -265,7 +267,14 @@ void nRF_Init(void){
 	#endif
 	nRF_DESELECT();
 	#else
+	nRF_PORT.OUTSET = nRF_SPI_MOSI | nRF_SPI_SCK | nRF_CE | nRF_CSN;
 	nRF_PORT.DIRSET = nRF_SPI_MOSI | nRF_SPI_SCK | nRF_CE | nRF_CSN;
 	nRF_SPI.CTRLA = SPI_MASTER_bm | SPI_ENABLE_bm;
 	#endif
+	address_t buf;
+	eeprom_read_block(&buf, (void*) nRF_EEPROM, sizeof(address_t));
+	real_address.state = stProcess;
+	if (buf.state == stReal){
+		memcpy(&real_address, &buf, sizeof(address_t));
+	}
 }

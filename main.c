@@ -19,37 +19,39 @@
 #include <stddef.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <avr/wdt.h>
+#include "sleep_rtc.h"
 #include "ds18b20.h"
 #include "nRF24L01P.h"
-#include "avr/sleep.h"
 
 
-#define SLEEP_WDT_S			8										//Интервал сна таймера WDT
-#define SLEEP_PERIOD_10MIN	((10*60)/SLEEP_WDT_S)					//Количество срабатываний WDT для интервала сна 10 минут
-#define ATTEMPT_SEND_MAX	10										//Максимальное количество попыток передачи
+#define SLEEP_PERIOD_DEFAULT	slp1S
+//#define SLEEP_PERIOD_DEFAULT	slp32S
 
-#define	WDT_int_on()		WDTCR |= Bit(WDCE) | Bit(WDTIE)			//Включить прерывания от собаки
+//#define SLEEP_PERIOD_LONG		slp32S
+#define SLEEP_PERIOD_LONG		slp4S
+#define ATTEMPT_SEND_MAX		10		//Maximum number of attempts to transfer measurement results or registration mode, over 10 second
+#define ATTEMPT_REG_MAX			10
+#define ATTEMPT_READ_SENSOR		10
 
-//ISR(wdt_reset){
-//Interrupts from the watchdog timer, just a stub so that when you wake up, it does not go to reset
-//}
-
-volatile static uint8_t mode = nrf_send;
+volatile static uint8_t mode = nrf_send_mode;
 
 ISR(BUTTON_INT_VECT){
 	if (BUTTON_PORT.INTFLAGS & BUTTON_PIN){
-		mode = nrf_reg;
+		if (!(BUTTON_PORT.IN & BUTTON_PIN)){
+			mode = nrf_reg_mode;
+		}
 		BUTTON_PORT.INTFLAGS |= BUTTON_PIN;
 	}
 }
 
 int main(void)
 {
-	uint8_t Attempt = ATTEMPT_SEND_MAX;
+	//	#include <avr/xmega.h>
+	//	_PROTECTED_WRITE(CLKCTRL.MCLKCTRLB, CLKCTRL_PEN_bm);
+
+	uint8_t attempt = ATTEMPT_SEND_MAX;
 	uint16_t Tempr;
 	
-	PORTB.DIRSET = PIN3_bm;
 	PORTB.DIRSET = PIN2_bm;
 	PORTB.OUTCLR = PIN2_bm;
 	PORTB.OUTSET = PIN2_bm;
@@ -57,60 +59,53 @@ int main(void)
 
 	BUTTON_PORT.DIRCLR = BUTTON_PIN;
 	BUTTON_INT = BUTTON_INT_TYPE | PORT_PULLUPEN_bm;
-	
+
+	RTC_1KHZ_init();
 	//	PRR = (1<<PRTIM0) | (1<<PRADC);									//Выключить таймер и АЦП для экономии электричества
 	//	wdt_reset();													//Сброс watchdog
-	//	sei();
+	mode = nrf_send_mode;
+	sei();
 	
-	//	nRF_Init();
+	nRF_Init();
 
-	mode = nrf_reg;
+	sleep_period_t period = SLEEP_PERIOD_DEFAULT;		//Attempts have not yet been exhausted, we will try in 1 second
 	while(1){
 		
-		Tempr = GetTemperature(Attempt);
-		if (Tempr != SENSOR_NO){
-			PORTB.OUTCLR = PIN3_bm;
-			PORTB.OUTSET = PIN3_bm;
-		}
+		Tempr = GetTemperature(ATTEMPT_READ_SENSOR);
 		uint8_t buf[4];
 		buf[0] = DEVICE_TYPE_MH_Z19;
 		buf[1] = DEVICE_TYPE_MH_Z19;
 		buf[2] = (uint8_t)(Tempr>>8);
 		buf[3] = (uint8_t)Tempr;
-		nrf_err_t res = nRF_Send(mode, buf, 4, &nRF_Answer);
-		if (res != nRF_OK){					//error
-			if ((mode == nrf_reg) && (res == nRF_ERR_NO_REG_MODE) && nRF_real_address_is_set()){	//no reg mode and real address is set, send data
-				mode = nrf_send;	//return to normal mode
-				if (nRF_Send(nrf_send, buf, 4, &nRF_Answer) == nRF_OK){
-					continue;
+		nrf_err_t res_send = nRF_Send(mode, buf, 4, &nRF_Answer);
+		if (res_send == nRF_OK){
+			if (mode == nrf_send_mode){	//data transferred
+				period = SLEEP_PERIOD_LONG;	//white long delay if answer not correct TODO:Добавить проверку типа команды и датчика
+				if (nRF_Answer.Len == DEVICE_ANSWER_LEN){	//response in the measurement transfer mode, we check the correctness of the response and set the sleep period depending on the response
+					period = *(nRF_Answer.Data+DEVICE_ANSWER_NUM_PERIOD);
+					attempt = ATTEMPT_SEND_MAX;
 				}
+				sleep_period_set(period);
+				continue;
 			}
-			Attempt--;												//Минус одна попытка
-			/*			if (Attempt==0){										//Попытки передачи исчерпаны, переходим на 10 минутный интервал передачи
-			nRF_Answer.Cmd = SLEEP_WDT_S;
-			nRF_Answer.Data = SLEEP_PERIOD_10MIN;
+			//registration mode
+			if (nRF_real_address_is_set()){
+				//registration completed successfully
+				attempt = ATTEMPT_SEND_MAX;
+				mode = nrf_send_mode;	//send data
+				continue;	//!!!!!!!!!!!!!!!!!!!!! continue without sleep!
 			}
-			else{													//Попытки еще не исчерпаны попытаемся через 1 секунду
-			nRF_Answer.Cmd = 0;
-			nRF_Answer.Data = SLEEP_PERIOD_10MIN;
+		}
+		if (res_send == nRF_ERR_NO_MODULE){	//module not found
+			while(1){
+				sleep_period_set(slp32S);	//halt-sleep
 			}
-			*/
 		}
-		else {
-			Attempt = ATTEMPT_SEND_MAX;
+		attempt--;
+		if (!attempt){
+			sleep_period_set(SLEEP_PERIOD_LONG);
+			attempt = ATTEMPT_SEND_MAX;
+			mode = nrf_send_mode;	//reset registraion mode
 		}
-		
-		/*
-		set_sleep_mode(SLEEP_MODE_PWR_DOWN);						//Режим глубокого сна - просыпается только от собаки или низкого уровня на INT0
-		WDTCR |= Bit(WDCE) | (nRF_Answer.Cmd & ((1<<WDP3) | (1<<WDP2) | (1<<WDP1) | (1<<WDP0)));	//Команда засыпания
-		for (u08 CountSleep = nRF_Answer.Data; CountSleep; CountSleep--){	//Спим
-		PORTB = 0;
-		PORTB = 0xff;											//Подтянуть к питанию для экономии энергии
-		WDT_int_on();
-		sleep_enable();
-		sleep_cpu();
-		sleep_disable();										//Проснулись -------------------------
-		}
-		*/
 	}
 }

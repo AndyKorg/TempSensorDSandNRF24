@@ -8,7 +8,8 @@
 #include <avr/interrupt.h>
 
 #define F_CLOCK		20000000UL
-#define F_CPU		(F_CLOCK/6)	//default prescaller
+#define F_CPU		(F_CLOCK/6UL)	//default prescaller
+#define isr_state()				(SREG & CPU_I_bm)
 
 #ifdef DEBUG
 
@@ -72,6 +73,10 @@
 #endif
 #endif
 
+#define nRF_EEPROM				EEPROM_START	//storage for address and state registration
+
 //------------------ TIMER -----------------------------------
+#define SLEEP_TIMER				RTC
+#define ONE_WIRE_TIMER			TCA0
 
 #endif /* HAL_H_ */

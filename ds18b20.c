@@ -3,7 +3,7 @@
 */
 
 #include "HAL.h"
-#include <util/delay.h>
+#include "sleep_rtc.h"
 #include "OneWare.h"
 #include "ds18b20.h"
 
@@ -29,7 +29,8 @@ uint16_t GetTemperature(uint8_t attempt){
 		if (OneWareReset()){
 			OneWareSendByte(ONE_WARE_SKIP_ROM);							//all devices
 			OneWareSendByte(DS18B20_START);
-			_delay_ms(100);												//wait result
+			sleep_period_set(slp125MS);
+			//_delay_ms(100);												//wait result
 			OneWareReset();
 			OneWareSendByte(ONE_WARE_SKIP_ROM);
 			OneWareSendByte(DS18B20_READ);
