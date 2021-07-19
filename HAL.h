@@ -73,7 +73,7 @@
 #endif
 #endif
 
-#define nRF_EEPROM				EEPROM_START	//storage for address and state registration
+#define nRF_EEPROM				0				//offset for address and address registration status
 
 //------------------ TIMER -----------------------------------
 #define SLEEP_TIMER				RTC

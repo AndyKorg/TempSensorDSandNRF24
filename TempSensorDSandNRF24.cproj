@@ -38,7 +38,7 @@
       </framework-data>
     </AsfFrameworkConfig>
     <avrtool>com.atmel.avrdbg.tool.medbg</avrtool>
-    <preserveEEPROM>true</preserveEEPROM>
+    <preserveEEPROM>false</preserveEEPROM>
     <ResetRule>0</ResetRule>
     <EraseKey />
     <avrtoolserialnumber>XYS by Vidmo UPDI/04</avrtoolserialnumber>
