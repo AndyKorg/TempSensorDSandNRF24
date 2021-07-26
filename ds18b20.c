@@ -8,8 +8,11 @@
 #include "ds18b20.h"
 
 //------------- Command DS18B20
-#define DS18B20_START			0x44								//start measure
-#define DS18B20_READ			0xbe								//read results
+#define DS18B20_START			0x44	//start measure
+#define DS18B20_READ			0xbe	//read results
+
+#define DS18B20_WAIT_MS			100		//waiting for the measurement result
+
 
 void crc_calc(uint8_t byte, uint8_t *crc){
 	for (uint8_t i = 0; i < 8; i++)
@@ -21,7 +24,7 @@ void crc_calc(uint8_t byte, uint8_t *crc){
 	}
 }
 
-uint16_t GetTemperature(uint8_t attempt){
+uint16_t GetTemperDS18b20(uint8_t attempt){
 	uint8_t Hi, Lo, crc = 0;
 
 	OneWareIni();
@@ -29,14 +32,16 @@ uint16_t GetTemperature(uint8_t attempt){
 		if (OneWareReset()){
 			OneWareSendByte(ONE_WARE_SKIP_ROM);							//all devices
 			OneWareSendByte(DS18B20_START);
-			sleep_period_set(slp125MS);
-			//_delay_ms(100);												//wait result
+			period_t tmp;
+			tmp.dim = dd_mSec;
+			tmp.value = DS18B20_WAIT_MS;
+			sleep_period_set(tmp);				//wait result
 			OneWareReset();
 			OneWareSendByte(ONE_WARE_SKIP_ROM);
 			OneWareSendByte(DS18B20_READ);
-			Lo = OneWareReciveByte();//byte 0  Temperature LSB
+			Lo = OneWareReciveByte(); //byte 0  Temperature LSB
 			crc_calc(Lo, &crc);
-			Hi = OneWareReciveByte();//Byte 1 Temperature MSB
+			Hi = OneWareReciveByte(); //Byte 1 Temperature MSB
 			crc_calc(Hi, &crc);
 			crc_calc(OneWareReciveByte(), &crc);;//Byte 2 TH Register or User Byte
 			crc_calc(OneWareReciveByte(), &crc);;//Byte 3 TL Register or User Byte 2

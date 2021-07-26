@@ -66,4 +66,6 @@ nrf_err_t nRF_Send(const nrf_oper_t oper, const uint8_t *data, const uint8_t len
 
 bool nRF_real_address_is_set(void);
 
+void debug_off(void);
+
 #endif /* NRF24L01P_H_ */

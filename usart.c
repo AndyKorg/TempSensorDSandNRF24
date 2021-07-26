@@ -1,124 +1,122 @@
-/*
- * usart.c
- *
- * Created: 21.10.2013 13:47:36
- *  Author: Admin
- */ 
-
+#include <stdio.h>
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include "HAL.h"
 #include "usart.h"
-#include <string.h>
-#include <stddef.h>
-//#include "sensors.h"
+#include "FIFO.h"
 
-#ifdef DEBUG
-#ifndef __AVR_ATtiny13A__
+#define BAUD_RATE		115200
+#define CMD_PILOT1		0x55
+#define CMD_PILOT2		0xAA
+#define CMD_PILOT_COUNT	4
 
-#ifndef TX_ONLY
-	volatile struct usartBuf usartRXbuf;
-#endif
+#define UROUND(x) ((2UL*(x)+1)/2)
 
-volatile struct usartBuf usartTXbuf;
+volatile FIFO(UART_BUF_LEN) txBuf, rxBuf, cmd;
+static usart_cmd_cb func_cb;
 
-/************************************************************************/
-/* Прием-передача USART													*/
-/************************************************************************/
-//-------- Инициализация USART
-void SerilalIni(void){
-	UCSRB =	(1<<RXEN) |											//Разрешить прием
-			(1<<TXEN);											//Разрешить передачу по USART
-	usartRXIEnable;												//Разрешить прерывание от приемника, при начале передачи дополнительно разрешается прерывания при пустом регистре передатчика
-	UCSRC = USART_MODE | USART_DATA_LEN | USART_STOP_BIT | USART_PARITY;
-	UBRRH = UBRRH_VALUE;
-	UBRRL = UBRRL_VALUE;
-	#if USE_2X
-		UCSRA |= (1 << U2X);
-	#else
-		UCSRA &= ~(0 << U2X);
-	#endif
-#ifndef TX_ONLY
-	usartRXbuf.len = 0;
-#endif
-	usartTXbuf.len = 0;
-}
+static int my_putchar(char c, FILE *stream);
 
-#ifndef TX_ONLY
-//------ Собственно прием байта и помещение его в буфер
-ISR(USART_RXC_vect){
-	u08 rxbyte = UDR;
-	
-	if RxCMDReady												//Предыдущая команда не обработана, игнорируется текущая
-		return;
-	if (usartRXAdr != RX_LEN_STR){
-		usartRXbuf.buf[usartRXAdr] = rxbyte;
-		usartRXbuf.len++;
-		UDR = rxbyte;
-		usartTXIEnable;											//Разрешается передача
-		//RxCMDReadySet;
-	}
-}
-#endif
+static FILE mystdout = FDEV_SETUP_STREAM(
+my_putchar,
+NULL,
+_FDEV_SETUP_WRITE
+);
 
-//------ Прерывание - передатчик пуст
-ISR(USART_UDRE_vect){
-	static u08 CurrentChar = 0;
-	
-	if (usartTXbuf.len){
-		UDR = usartTXbuf.buf[CurrentChar++];					//Передается очередной символ
-		if (usartTXbuf.len == CurrentChar){						//Данных в буфере больше нет, передачу запрещаем
-			usartTXIEdisable;
-			CurrentChar = 0;
-			usartTXbuf.len = 0;									//Все передано
+static bool usart_state_set(bool *value){
+	static bool busy = false;
+	if (value){
+		bool i_state = isr_state();
+		busy = *value;
+		if (!i_state){
+			cli();
 		}
 	}
+	return busy;
 }
 
-//------ Помещает байт c в буфер передачи
-unsigned char usart_putchar(char c){
-	u08 storeInt = UCSRB, Ret = USART_BUF_READY;				//Символ благополучно помещен в буфер
-	
-	usartTXIEdisable;											//Запретить прерывание от передатчика на время обработки
-	if (usartTXbuf.len == RX_LEN_STR)							//Буфер передачи полон
-		Ret = USART_BUF_BUSY;
-	else
-		usartTXbuf.buf[usartTXbuf.len++] = c;
-	if TXIEisSet(storeInt)										//Если прерывания были разрешены то разрешить их снова
-		usartTXIEnable;
-	usartTXIEnable;												//Разрешается передача
-	return Ret;
-}
+#define usart_busy()	do {bool busy = true; usart_state_set(&busy);} while (0)
+#define usart_free()	do {bool busy = false; usart_state_set(&busy);} while (0)
 
-void usart_hex(unsigned char c){
-	#define HI(b)	((b>>4) & 0xf)
-	#define LO(b)	(b & 0xf)
-	#define HE(b)	(((b & 0x7)-1) | 0x40)
-	
-	if (HI(c)>9)
-		usart_putchar(HE(HI(c)));
-	else
-		usart_putchar(0x30 | HI(c));
-	if (LO(c)>9)
-		usart_putchar(HE(LO(c)));
-	else
-		usart_putchar(0x30 | LO(c));
-}
-
-/************************************************************************/
-/* Возвращает количество принятых байт или 0 если ничего не принято     */
-/************************************************************************/
-#ifndef TX_ONLY
-unsigned char usart_gets(unsigned char *s){
-	u08 len = usartRXAdr;
-	
-	if RxCMDReady{
-		memcpy(s, &usartRXbuf.buf, len);
-		usartRXbuf.len = 0;
-		RxCMDReadyClear;
-		return len;
+ISR(USART0_TXC_vect){
+	if (FIFO_IS_EMPTY(txBuf)){
+		usart_free();
 	}
-	else
-		return 0;
 }
-#endif
 
-#endif	//#ifndef __AVR_ATtiny13__
-#endif	//#ifdef DEBUG
+ISR(USART0_DRE_vect){
+	if (!FIFO_IS_EMPTY(txBuf)){
+		USART0.TXDATAL = FIFO_FRONT(txBuf);
+		FIFO_POP(txBuf);
+		return;
+	}
+	USART0.CTRLA &= ~USART_DREIE_bm;
+}
+
+ISR(USART0_RXC_vect){
+	static uint8_t posCmd = 0;
+	static cmd_t cmd;
+	uint8_t data = USART0.RXDATAL;
+	
+	const uint8_t cmdPilot[CMD_PILOT_COUNT] = {CMD_PILOT1, CMD_PILOT2, CMD_PILOT1, CMD_PILOT2};
+	if (posCmd < CMD_PILOT_COUNT ){
+		cmd.cmd = CMD_EMPTY;
+		if (data != cmdPilot[posCmd]){
+			posCmd = 0;
+			return;
+		}
+	}
+	else if (posCmd == CMD_PILOT_COUNT){
+		cmd.cmd = data;
+	}
+	else if (posCmd > (CMD_PILOT_COUNT)) {
+		bool endcmd = false;
+		//printf("%x\r", data);
+		if ((posCmd-CMD_PILOT_COUNT-1) < MAX_DATA_CMD){
+			cmd.data[posCmd - CMD_PILOT_COUNT-1] = data;
+			if (data == 0) {
+				endcmd = true;
+			}
+		}
+		else {
+			posCmd = 0;
+		}
+		if (endcmd){
+			posCmd = 0;
+			if (func_cb){
+				func_cb(cmd);
+			}
+			return;
+		}
+	}
+	posCmd++;
+}
+
+static int my_putchar(char c, FILE *stream){
+	USART0.CTRLA &= ~USART_DREIE_bm;
+	if (!FIFO_IS_FULL(txBuf)){
+		FIFO_PUSH(txBuf, c);
+	}
+	USART0.CTRLA |= USART_DREIE_bm;
+	usart_busy();
+	return 0;
+}
+
+bool usart_is_busy(void){
+	return usart_state_set(NULL);
+}
+
+bool usart_init(usart_cmd_cb func){
+	func_cb = func;
+
+	debugConPortInit();
+	USART0.BAUD = (64UL*F_CPU)/(16*BAUD_RATE);
+	
+	USART0.CTRLB |= USART_TXEN_bm | USART_RXCIE_bm;
+	USART0.CTRLA |= USART_TXCIF_bm | USART_DREIF_bm | USART_RXCIE_bm;
+	PORTB.PIN3CTRL = PORT_PULLUPEN_bm;	//reduced consumption during sleep
+	
+	FIFO_FLUSH(txBuf);
+	stdout = &mystdout;
+	return true;
+}

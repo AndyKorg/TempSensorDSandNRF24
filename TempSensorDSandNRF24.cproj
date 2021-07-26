@@ -108,7 +108,7 @@
         <avrgcc.compiler.general.ChangeDefaultBitFieldUnsigned>True</avrgcc.compiler.general.ChangeDefaultBitFieldUnsigned>
         <avrgcc.compiler.symbols.DefSymbols>
           <ListValues>
-            <Value>NODEBUG</Value>
+            <Value>DEBUG</Value>
           </ListValues>
         </avrgcc.compiler.symbols.DefSymbols>
         <avrgcc.compiler.directories.IncludePaths>
@@ -145,7 +145,16 @@
     <Compile Include="external_device.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="FIFO.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="HAL.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="InternalTemp.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="InternalTemp.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="nRF24L01P Reg.h">
@@ -170,6 +179,12 @@
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="sleep_rtc.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="usart.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="usart.h">
       <SubType>compile</SubType>
     </Compile>
   </ItemGroup>

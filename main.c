@@ -17,20 +17,30 @@
 
 
 #include <stddef.h>
+#include <stdint.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include "sleep_rtc.h"
-#include "ds18b20.h"
+
+#include "HAL.h"
 #include "nRF24L01P.h"
+#include "sleep_rtc.h"
+
+#if SENSOR_TYPE == DEVICE_TYPE_DS18B20
+#include "ds18b20.h"
+#elif SENSOR_TYPE == DEVICE_TYPE_INTER_TEMPR
+#include "InternalTemp.h"
+#endif
 
 
-#define SLEEP_PERIOD_DEFAULT	slp1S
-//#define SLEEP_PERIOD_DEFAULT	slp32S
+#ifdef DEBUG
+#include "usart.h"
+#include <stdio.h>
+#endif
 
-//#define SLEEP_PERIOD_LONG		slp32S
-#define SLEEP_PERIOD_LONG		slp4S
-#define ATTEMPT_SEND_MAX		10		//Maximum number of attempts to transfer measurement results or registration mode, over 10 second
-#define ATTEMPT_REG_MAX			10
+#define SLEEP_PERIOD_DEFAULT_S	1
+
+#define SLEEP_PERIOD_LONG_M		4		//sleep period if the receiver does not respond after all transmission attempts, minute
+#define ATTEMPT_SEND_MAX		20		//Maximum number of attempts to transfer measurement results or registration mode
 #define ATTEMPT_READ_SENSOR		10
 
 volatile static uint8_t mode = nrf_send_mode;
@@ -39,9 +49,49 @@ ISR(BUTTON_INT_VECT){
 	if (BUTTON_PORT.INTFLAGS & BUTTON_PIN){
 		if (!(BUTTON_PORT.IN & BUTTON_PIN)){
 			mode = nrf_reg_mode;
+			sleep_period_stop();
 		}
 		BUTTON_PORT.INTFLAGS |= BUTTON_PIN;
 	}
+}
+
+#ifdef DEBUG
+bool console_cmd(cmd_t cmd){
+	return true;
+}
+#endif
+
+inline void pin_off_unused(void){
+	//PORTA.PIN0CTRL = PORT_ISC_INPUT_DISABLE_gc;
+	//PORTA.PIN1CTRL = PORT_ISC_INPUT_DISABLE_gc;	//MOSI
+	//PORTA.PIN2CTRL = PORT_ISC_INPUT_DISABLE_gc;	//MISO
+	//PORTA.PIN3CTRL = PORT_ISC_INPUT_DISABLE_gc;	//SCK
+	//PORTA.PIN4CTRL = PORT_ISC_INPUT_DISABLE_gc;	//CSN
+	//PORTA.PIN5CTRL = PORT_ISC_INPUT_DISABLE_gc;	//CE
+	PORTA.PIN6CTRL = PORT_ISC_INPUT_DISABLE_gc;		//IRQ
+	PORTA.PIN7CTRL = PORT_ISC_INPUT_DISABLE_gc;
+
+	PORTB.PIN0CTRL = PORT_ISC_INPUT_DISABLE_gc;		//SDA
+	PORTB.PIN1CTRL = PORT_ISC_INPUT_DISABLE_gc;		//SCL
+	PORTB.PIN2CTRL = PORT_ISC_INPUT_DISABLE_gc;		//TXD
+
+	//PORTB.PIN3CTRL = PORT_ISC_INPUT_DISABLE_gc;		//RXD
+	PORTB.PIN4CTRL = PORT_ISC_INPUT_DISABLE_gc;	//1-wire
+
+	PORTB.PIN5CTRL = PORT_ISC_INPUT_DISABLE_gc;
+	PORTB.PIN6CTRL = PORT_ISC_INPUT_DISABLE_gc;
+	PORTB.PIN7CTRL = PORT_ISC_INPUT_DISABLE_gc;
+
+	//PORTC.PIN0CTRL = PORT_ISC_INPUT_DISABLE_gc;	//button
+
+	PORTC.PIN1CTRL = PORT_ISC_INPUT_DISABLE_gc;		//power mh-z19
+	PORTC.PIN2CTRL = PORT_ISC_INPUT_DISABLE_gc;
+	PORTC.PIN3CTRL = PORT_ISC_INPUT_DISABLE_gc;
+	PORTC.PIN4CTRL = PORT_ISC_INPUT_DISABLE_gc;
+	PORTC.PIN5CTRL = PORT_ISC_INPUT_DISABLE_gc;
+	PORTC.PIN6CTRL = PORT_ISC_INPUT_DISABLE_gc;		//no pin
+	PORTC.PIN7CTRL = PORT_ISC_INPUT_DISABLE_gc;		//no pin
+
 }
 
 int main(void)
@@ -52,39 +102,51 @@ int main(void)
 	uint8_t attempt = ATTEMPT_SEND_MAX;
 	uint16_t Tempr;
 	
-	PORTB.DIRSET = PIN2_bm;
-	PORTB.OUTCLR = PIN2_bm;
-	PORTB.OUTSET = PIN2_bm;
+	#ifdef DEBUG
+	debugPortIni();
+	debugBoth();
+	usart_init(console_cmd);
+	#endif
+	
 	nrf_Response_t nRF_Answer;
 
 	BUTTON_PORT.DIRCLR = BUTTON_PIN;
 	BUTTON_INT = BUTTON_INT_TYPE | PORT_PULLUPEN_bm;
 
 	RTC_1KHZ_init();
-	//	PRR = (1<<PRTIM0) | (1<<PRADC);									//Выключить таймер и АЦП для экономии электричества
-	//	wdt_reset();													//Сброс watchdog
 	mode = nrf_send_mode;
 	sei();
 	
+	pin_off_unused();
 	nRF_Init();
 
-	sleep_period_t period = SLEEP_PERIOD_DEFAULT;		//Attempts have not yet been exhausted, we will try in 1 second
+	period_t period;
+
 	while(1){
 		
-		Tempr = GetTemperature(ATTEMPT_READ_SENSOR);
 		uint8_t buf[4];
-		buf[0] = DEVICE_TYPE_MH_Z19;
-		buf[1] = DEVICE_TYPE_MH_Z19;
+		#if SENSOR_TYPE == DEVICE_TYPE_DS18B20
+		Tempr = GetTemperDS18b20(ATTEMPT_READ_SENSOR);
+		#elif SENSOR_TYPE == DEVICE_TYPE_INTER_TEMPR
+		Tempr = GetTemperature(ATTEMPT_READ_SENSOR);
+		#endif
+		DEBUG_LOG("t %d\r", Tempr);
+		buf[0] = SENSOR_TYPE;
+		buf[1] = 0;
 		buf[2] = (uint8_t)(Tempr>>8);
 		buf[3] = (uint8_t)Tempr;
 		nrf_err_t res_send = nRF_Send(mode, buf, 4, &nRF_Answer);
+		period.dim = dd_Sec;
+		period.value = SLEEP_PERIOD_DEFAULT_S;
 		if (res_send == nRF_OK){
 			if (mode == nrf_send_mode){	//data transferred
-				period = SLEEP_PERIOD_LONG;	//white long delay if answer not correct TODO:Добавить проверку типа команды и датчика
+				period.dim = dd_Min;
+				period.value = SLEEP_PERIOD_LONG_M;	//white long delay if answer not correct TODO:Добавить проверку типа команды и датчика
 				if (nRF_Answer.Len == DEVICE_ANSWER_LEN){	//response in the measurement transfer mode, we check the correctness of the response and set the sleep period depending on the response
-					period = *(nRF_Answer.Data+DEVICE_ANSWER_NUM_PERIOD);
+					period.value = *((uint16_t*)(nRF_Answer.Data+DEVICE_ANSWER_NUM_PERIOD));
 					attempt = ATTEMPT_SEND_MAX;
 				}
+				DEBUG_LOG("send OK %d\r", period.value);
 				sleep_period_set(period);
 				continue;
 			}
@@ -93,19 +155,50 @@ int main(void)
 				//registration completed successfully
 				attempt = ATTEMPT_SEND_MAX;
 				mode = nrf_send_mode;	//send data
+				DEBUG_LOG("reg ok\r");
 				continue;	//!!!!!!!!!!!!!!!!!!!!! continue without sleep!
 			}
+			DEBUG_LOG("OK no reg %d\r", period.value);
 		}
-		if (res_send == nRF_ERR_NO_MODULE){	//module not found
+		else if (res_send == nRF_ERR_NO_ANSWER){	//reciver not answer
+			if (attempt == 1){
+				period.dim = dd_Min;
+				period.value = SLEEP_PERIOD_LONG_M;
+				DEBUG_LOG("reciver no answer\r");
+			}
+			else {
+				period.dim = dd_Sec;				//white 1 second
+				period.value = SLEEP_PERIOD_DEFAULT_S;
+				DEBUG_LOG("next attempt %ds %d\r", SLEEP_PERIOD_DEFAULT_S, attempt);
+			}
+		}
+		else if(res_send == nRF_ERR_ADDR_NOT_FOUND){
+			DEBUG_LOG("real adr not set\r");
 			while(1){
-				sleep_period_set(slp32S);	//halt-sleep
+				period.dim = dd_Min;
+				period.value = UINT16_MAX;
+				sleep_period_set(period);			//halt-sleep!!!!!!!!!!!
+				if (mode == nrf_reg_mode){			//registration mode is set, exit from stop
+					attempt = ATTEMPT_SEND_MAX;
+					DEBUG_LOG("reg start\r");
+					break;
+				}
+			}
+		}
+		else if (res_send == nRF_ERR_NO_MODULE){	//module not found
+			DEBUG_LOG("RF module not set\r");
+			while(1){
+				period.dim = dd_Min;
+				period.value = UINT16_MAX;
+				sleep_period_set(period);	//halt-sleep!!!!!!!!!!!
 			}
 		}
 		attempt--;
 		if (!attempt){
-			sleep_period_set(SLEEP_PERIOD_LONG);
+			DEBUG_LOG("attempt end %d\r", period.value);
 			attempt = ATTEMPT_SEND_MAX;
 			mode = nrf_send_mode;	//reset registraion mode
 		}
+		sleep_period_set(period);
 	}
 }

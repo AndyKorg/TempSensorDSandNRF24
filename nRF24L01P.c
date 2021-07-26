@@ -267,8 +267,10 @@ void nRF_Init(void){
 	#endif
 	nRF_DESELECT();
 	#else
+	//tinyAVR® 1-series
 	nRF_PORT.OUTSET = nRF_SPI_MOSI | nRF_SPI_SCK | nRF_CE | nRF_CSN;
 	nRF_PORT.DIRSET = nRF_SPI_MOSI | nRF_SPI_SCK | nRF_CE | nRF_CSN;
+	nRF_PORT.nRF_SPI_MISO_CRL = PORT_PULLUPEN_bm;	//reduced consumption during sleep
 	nRF_SPI.CTRLA = SPI_MASTER_bm | SPI_ENABLE_bm;
 	#endif
 	address_t buf;
@@ -277,4 +279,12 @@ void nRF_Init(void){
 	if (buf.state == stReal){
 		memcpy(&real_address, &buf, sizeof(address_t));
 	}
+}
+
+void debug_off(void){
+	nRF_STOP();											//stop transfer
+	nRF_DESELECT();
+	uint8_t Buf[2];
+	Buf[0] = (0<<nRF_PWR_UP);							//Âûêëþ÷èòü ïëàòó
+	nRF_cmd_Write(nRF_WR_REG(nRF_CONFIG), 1, Buf);
 }
