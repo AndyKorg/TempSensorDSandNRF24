@@ -13,8 +13,8 @@
 #define isr_state()	(SREG & CPU_I_bm)
 
 //------------------ select type sensor  -----------------------------------
-#define SENSOR_TYPE		DEVICE_TYPE_DS18B20
-//#define SENSOR_TYPE		DEVICE_TYPE_INTER_TEMPR
+//#define SENSOR_TYPE		DEVICE_TYPE_DS18B20
+#define SENSOR_TYPE		DEVICE_TYPE_INTER_TEMPR
 //#define SENSOR_TYPE		DEVICE_TYPE_MH_Z19
 
 #ifdef DEBUG

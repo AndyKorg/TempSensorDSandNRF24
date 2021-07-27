@@ -25,21 +25,6 @@
 #define ONE_WIRE_IS_NULL()			((ONE_WIRE_PORT.IN & ONE_WIRE_PIN)?0:1)	//input low level
 #define ONE_WIRE_IS_ONE()			((ONE_WIRE_PORT.IN & ONE_WIRE_PIN)?1:0)	//input hight level
 
-typedef void (*one_wire_cb)(void);
-
-one_wire_cb func_cb = NULL;
-
-void portb2tog(void){
-PORTB.OUTTGL = PIN2_bm;	
-}
-
-ISR(TCB0_INT_vect){
-//	if (func_cb) func_cb();
-PORTB.OUTTGL = PIN2_bm;	
-	TCB0.INTFLAGS = TCB_CAPT_bm;
-}
-
-
 /*
 \brief reset bus and check device on the bus
 */
@@ -49,6 +34,8 @@ uint8_t OneWareReset(void){
 	bool i_state = isr_state();
 
 	cli();
+	//enable tightening during tire testing
+	ONE_WIRE_PORT.ONE_WIRE_PIN_CTRL |= PORT_PULLUPEN_bm;
 	ONE_WIRE_NULL();
 	_delay_us(ONE_WARE_RESET_480_us);	//presence
 	ONE_WIRE_ONE_REL();
@@ -60,6 +47,7 @@ uint8_t OneWareReset(void){
 			break;
 		}
 	}
+	ONE_WIRE_PORT.ONE_WIRE_PIN_CTRL &= ~PORT_PULLUPEN_bm;
 	_delay_us(ONE_WARE_RESET_480_us);	//delay between command
 	if (i_state) sei();
 	return Ret;
@@ -110,12 +98,4 @@ uint8_t OneWareReciveByte(void){
 void OneWareIni(void){
 	ONE_WIRE_PORT.OUTCLR = ONE_WIRE_PIN;
 	ONE_WIRE_NULL();
-
-//TCB0.INTCTRL = TCB_CAPT_bm /* Capture or Timeout: enabled */;
-//TCB0.CNT = 0;
-//TCB0.CCMP = 1;ONE_WIRE_TIC(1);
-//TCB0.CTRLA = TCB_CLKSEL_CLKDIV1_gc  /* CLK_PER (No Prescaling) */
-//| TCB_ENABLE_bm;   /* Enable: enabled */
-//func_cb = portb2tog;
-
 }

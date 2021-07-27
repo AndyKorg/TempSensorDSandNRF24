@@ -75,22 +75,25 @@ inline void pin_off_unused(void){
 	PORTB.PIN1CTRL = PORT_ISC_INPUT_DISABLE_gc;		//SCL
 	PORTB.PIN2CTRL = PORT_ISC_INPUT_DISABLE_gc;		//TXD
 
-	//PORTB.PIN3CTRL = PORT_ISC_INPUT_DISABLE_gc;		//RXD
+	PORTB.PIN3CTRL = PORT_ISC_INPUT_DISABLE_gc;	//RXD
+	#if SENSOR_TYPE != DEVICE_TYPE_DS18B20
 	PORTB.PIN4CTRL = PORT_ISC_INPUT_DISABLE_gc;	//1-wire
-
+	#endif
 	PORTB.PIN5CTRL = PORT_ISC_INPUT_DISABLE_gc;
 	PORTB.PIN6CTRL = PORT_ISC_INPUT_DISABLE_gc;
 	PORTB.PIN7CTRL = PORT_ISC_INPUT_DISABLE_gc;
 
 	//PORTC.PIN0CTRL = PORT_ISC_INPUT_DISABLE_gc;	//button
 
+	#if SENSOR_TYPE != DEVICE_TYPE_MH_Z19s
 	PORTC.PIN1CTRL = PORT_ISC_INPUT_DISABLE_gc;		//power mh-z19
+	#endif
 	PORTC.PIN2CTRL = PORT_ISC_INPUT_DISABLE_gc;
 	PORTC.PIN3CTRL = PORT_ISC_INPUT_DISABLE_gc;
 	PORTC.PIN4CTRL = PORT_ISC_INPUT_DISABLE_gc;
 	PORTC.PIN5CTRL = PORT_ISC_INPUT_DISABLE_gc;
-	PORTC.PIN6CTRL = PORT_ISC_INPUT_DISABLE_gc;		//no pin
-	PORTC.PIN7CTRL = PORT_ISC_INPUT_DISABLE_gc;		//no pin
+	PORTC.PIN6CTRL = PORT_ISC_INPUT_DISABLE_gc;		//no pin in MK
+	PORTC.PIN7CTRL = PORT_ISC_INPUT_DISABLE_gc;		//no pin in MK
 
 }
 
@@ -161,14 +164,14 @@ int main(void)
 			DEBUG_LOG("OK no reg %d\r", period.value);
 		}
 		else if (res_send == nRF_ERR_NO_ANSWER){	//reciver not answer
+			period.dim = dd_Sec;				//white 1 second
+			period.value = SLEEP_PERIOD_DEFAULT_S;
 			if (attempt == 1){
 				period.dim = dd_Min;
 				period.value = SLEEP_PERIOD_LONG_M;
 				DEBUG_LOG("reciver no answer\r");
 			}
 			else {
-				period.dim = dd_Sec;				//white 1 second
-				period.value = SLEEP_PERIOD_DEFAULT_S;
 				DEBUG_LOG("next attempt %ds %d\r", SLEEP_PERIOD_DEFAULT_S, attempt);
 			}
 		}
