@@ -6,6 +6,7 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include "external_device.h"
 
 #define F_CLOCK		20000000UL
 #undef F_CPU
@@ -55,13 +56,11 @@
 #define BUTTON_INT_TYPE			PORT_ISC_LEVEL_gc
 #define BUTTON_INT_VECT			PORTC_PORT_vect
 
-//------------------ ONE WIRE PORT -----------------------------------
-#if SENSOR_TYPE == DEVICE_TYPE_DS18B20
+//------------------ ONE WIRE PORT IF SENSOR_TYPE = DEVICE_TYPE_DS18B20 ---
 #define ONE_WIRE_PORT			PORTB
 #define ONE_WIRE_PIN			PIN4_bm
 #define ONE_WIRE_PIN_CTRL		PIN4CTRL
 #define ONE_WIRE_PORT_INT		PORTB_PORT_vect
-#endif
 
 //------------------ nRF24L01+  -----------------------------------
 //this not tested! #define nRF_SPI_SOFT							//comment out if using hard SPI

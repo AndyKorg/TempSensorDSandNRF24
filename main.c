@@ -43,15 +43,25 @@
 #define ATTEMPT_SEND_MAX		20		//Maximum number of attempts to transfer measurement results or registration mode
 #define ATTEMPT_READ_SENSOR		10
 
+#define allow_press_button()	do {BUTTON_PORT.INTFLAGS |= BUTTON_PIN; BUTTON_INT = BUTTON_INT_TYPE | PORT_PULLUPEN_bm;} while (0) //allow button press test
+
+#define halt_sleep()			do {\
+									period.dim = dd_Min;\
+									period.value = UINT16_MAX;\
+									allow_press_button();\
+									sleep_period_set(period);\
+								} while (0)
+
 volatile static uint8_t mode = nrf_send_mode;
 
 ISR(BUTTON_INT_VECT){
-	if (BUTTON_PORT.INTFLAGS & BUTTON_PIN){
+	if (BUTTON_PORT.INTFLAGS & BUTTON_PIN){		//test button pressed
 		if (!(BUTTON_PORT.IN & BUTTON_PIN)){
 			mode = nrf_reg_mode;
+			BUTTON_INT = PORT_PULLUPEN_bm;		//interrupt off
 			sleep_period_stop();
 		}
-		BUTTON_PORT.INTFLAGS |= BUTTON_PIN;
+		//BUTTON_PORT.INTFLAGS |= BUTTON_PIN;		//allowing retry only after attempts have been exhausted. see below.
 	}
 }
 
@@ -110,7 +120,7 @@ int main(void)
 	debugBoth();
 	usart_init(console_cmd);
 	#endif
-	
+
 	nrf_Response_t nRF_Answer;
 
 	BUTTON_PORT.DIRCLR = BUTTON_PIN;
@@ -150,6 +160,7 @@ int main(void)
 					attempt = ATTEMPT_SEND_MAX;
 				}
 				DEBUG_LOG("send OK %d\r", period.value);
+				allow_press_button();
 				sleep_period_set(period);
 				continue;
 			}
@@ -178,9 +189,7 @@ int main(void)
 		else if(res_send == nRF_ERR_ADDR_NOT_FOUND){
 			DEBUG_LOG("real adr not set\r");
 			while(1){
-				period.dim = dd_Min;
-				period.value = UINT16_MAX;
-				sleep_period_set(period);			//halt-sleep!!!!!!!!!!!
+				halt_sleep();
 				if (mode == nrf_reg_mode){			//registration mode is set, exit from stop
 					attempt = ATTEMPT_SEND_MAX;
 					DEBUG_LOG("reg start\r");
@@ -191,9 +200,7 @@ int main(void)
 		else if (res_send == nRF_ERR_NO_MODULE){	//module not found
 			DEBUG_LOG("RF module not set\r");
 			while(1){
-				period.dim = dd_Min;
-				period.value = UINT16_MAX;
-				sleep_period_set(period);	//halt-sleep!!!!!!!!!!!
+				halt_sleep();
 			}
 		}
 		attempt--;
@@ -201,6 +208,7 @@ int main(void)
 			DEBUG_LOG("attempt end %d\r", period.value);
 			attempt = ATTEMPT_SEND_MAX;
 			mode = nrf_send_mode;	//reset registraion mode
+			allow_press_button();
 		}
 		sleep_period_set(period);
 	}

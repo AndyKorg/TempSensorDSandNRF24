@@ -10,12 +10,11 @@
 #include <stdbool.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include "external_device.h"
 #include "HAL.h"
 #include "nRF24L01P Reg.h"
 
 #define nRF_CHANNEL				2				//Number RF chanel
-#define nRF_TYPE_SENSOR			DEVICE_TYPE_MH_Z19	//type sensor
+#define nRF_TYPE_SENSOR			SENSOR_TYPE		//type sensor
 
 typedef struct {								//answer PRX
 	uint8_t Len;								//length answer
