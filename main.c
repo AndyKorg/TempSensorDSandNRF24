@@ -46,11 +46,11 @@
 #define allow_press_button()	do {BUTTON_PORT.INTFLAGS |= BUTTON_PIN; BUTTON_INT = BUTTON_INT_TYPE | PORT_PULLUPEN_bm;} while (0) //allow button press test
 
 #define halt_sleep()			do {\
-									period.dim = dd_Min;\
-									period.value = UINT16_MAX;\
-									allow_press_button();\
-									sleep_period_set(period);\
-								} while (0)
+	period.dim = dd_Min;\
+	period.value = UINT16_MAX;\
+	allow_press_button();\
+	sleep_period_set(period);\
+} while (0)
 
 volatile static uint8_t mode = nrf_send_mode;
 
@@ -143,12 +143,12 @@ int main(void)
 		#elif SENSOR_TYPE == DEVICE_TYPE_INTER_TEMPR
 		Tempr = GetTemperature(ATTEMPT_READ_SENSOR);
 		#endif
-		DEBUG_LOG("t %d\r", Tempr);
 		buf[0] = SENSOR_TYPE;
 		buf[1] = 0;
 		buf[2] = (uint8_t)(Tempr>>8);
 		buf[3] = (uint8_t)Tempr;
 		nrf_err_t res_send = nRF_Send(mode, buf, 4, &nRF_Answer);
+		DEBUG_LOG("t %d mode %d res %d\r", Tempr, mode, res_send);
 		period.dim = dd_Sec;
 		period.value = SLEEP_PERIOD_DEFAULT_S;
 		if (res_send == nRF_OK){
@@ -156,7 +156,7 @@ int main(void)
 				period.dim = dd_Min;
 				period.value = SLEEP_PERIOD_LONG_M;	//white long delay if answer not correct TODO:Добавить проверку типа команды и датчика
 				if (nRF_Answer.Len == DEVICE_ANSWER_LEN){	//response in the measurement transfer mode, we check the correctness of the response and set the sleep period depending on the response
-					period.value = *((uint16_t*)(nRF_Answer.Data+DEVICE_ANSWER_NUM_PERIOD));
+					period.value = *((uint16_t*)(nRF_Answer.Data+DEVICE_ANSWER_PERIOD_OFFSET));
 					attempt = ATTEMPT_SEND_MAX;
 				}
 				DEBUG_LOG("send OK %d\r", period.value);
@@ -165,12 +165,14 @@ int main(void)
 				continue;
 			}
 			//registration mode
-			if (nRF_real_address_is_set()){
-				//registration completed successfully
-				attempt = ATTEMPT_SEND_MAX;
-				mode = nrf_send_mode;	//send data
-				DEBUG_LOG("reg ok\r");
-				continue;	//!!!!!!!!!!!!!!!!!!!!! continue without sleep!
+			if ((nRF_Answer.Len == PTX_REG_MODE_LEN) && ((*(nRF_Answer.Data+PTX_REG_TYPE_BYTE)) == SENSOR_TYPE)){
+				if (nRF_real_address_is_set()){
+					//registration completed successfully
+					attempt = ATTEMPT_SEND_MAX;
+					mode = nrf_send_mode;	//send data
+					DEBUG_LOG("reg ok\r");
+					continue;	//!!!!!!!!!!!!!!!!!!!!! continue without sleep!
+				}
 			}
 			DEBUG_LOG("OK no reg %d\r", period.value);
 		}
@@ -196,6 +198,7 @@ int main(void)
 					break;
 				}
 			}
+			continue;								//start registratin
 		}
 		else if (res_send == nRF_ERR_NO_MODULE){	//module not found
 			DEBUG_LOG("RF module not set\r");

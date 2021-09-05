@@ -15,7 +15,6 @@ The third byte code of the controlling microcontroller
 #define ADDR_LEN 				5	//address lenght device, while fixed
 
 #define REG_ATTEMPT_MAX			10	//maximum number attempt registration
-#define PTX_REG_MODE_LEN		(1 /*type*/ +1/*num.query*/ +5/*address*/)	//data size in PTX recording mode
 #define REG_ADDRESS				{0xe7,0xe7,0xe7,0xe7,0xe7}	//default address for registraion PTX mode
 #define PTX_REG_MODE_NULL_ADR	0,0,0,0,0	//zero address
 

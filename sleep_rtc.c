@@ -134,6 +134,11 @@ void sleep_period_set(period_t period){
 		default:
 		return;
 	}
+	#ifdef DEBUG
+	//white usart transsmit
+	while (usart_is_busy());
+	return; ////////////////////// ---------------------------
+	#endif
 	//delay period
 	while(period_ms){
 		if (period_ms < period_fix_ms[SLPEEP_MAX_STBY_FIX_IDX].milliseconds){

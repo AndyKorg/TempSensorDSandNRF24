@@ -27,9 +27,10 @@ static bool usart_state_set(bool *value){
 	static bool busy = false;
 	if (value){
 		bool i_state = isr_state();
+		cli();
 		busy = *value;
-		if (!i_state){
-			cli();
+		if (i_state){
+			sei();
 		}
 	}
 	return busy;

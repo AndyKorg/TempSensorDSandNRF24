@@ -15,6 +15,10 @@
 
 #define nRF_CHANNEL				2				//Number RF chanel
 #define nRF_TYPE_SENSOR			SENSOR_TYPE		//type sensor
+#define PTX_REG_MODE_LEN		(1 /*type*/ +1/*num.query*/ +5/*address*/)	//data size in PTX recording mode
+#define PTX_REG_TYPE_BYTE		0				//number byte type devices from PTX
+#define nRF_PRX_NO_REG_MODE		0xff			//prcs not in registration mode
+
 
 typedef struct {								//answer PRX
 	uint8_t Len;								//length answer
