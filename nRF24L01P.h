@@ -15,10 +15,6 @@
 
 #define nRF_CHANNEL				2				//Number RF chanel
 #define nRF_TYPE_SENSOR			SENSOR_TYPE		//type sensor
-#define PTX_REG_MODE_LEN		(1 /*type*/ +1/*num.query*/ +5/*address*/)	//data size in PTX recording mode
-#define PTX_REG_TYPE_BYTE		0				//number byte type devices from PTX
-#define nRF_PRX_NO_REG_MODE		0xff			//prcs not in registration mode
-
 
 typedef struct {								//answer PRX
 	uint8_t Len;								//length answer
@@ -50,7 +46,6 @@ void nRF_Init(void);
 /*
 \brief Data transmission and reception of nRF_Resp response over a given pipe.
 Parameters:
-oper - type operation.
 Data - data for send
 nRf_Resp - answer data
 Return:
@@ -61,8 +56,9 @@ nRF_ERR_NO_ANSWER - if PRX not answer
 nRF_ERR_NO_REG_MODE - not registration mode or another sensor is being registered
 In case of errors, the memory for the response is not allocated and is not captured.
 */
-nrf_err_t nRF_Send(const nrf_oper_t oper, const uint8_t *data, const uint8_t len, nrf_Response_t *nRF_Resp);
+nrf_err_t nRF_SendData(const uint8_t *data, const uint8_t len, nrf_Response_t *nRF_Resp);
 
+nrf_err_t nRF_TransmitReg(nrf_Response_t* nRF_Resp);
 /*
 \brief returns true if PTX have real address
 */

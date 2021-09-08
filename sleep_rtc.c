@@ -137,7 +137,7 @@ void sleep_period_set(period_t period){
 	#ifdef DEBUG
 	//white usart transsmit
 	while (usart_is_busy());
-	return; ////////////////////// ---------------------------
+//	return; ////////////////////// ---------------------------
 	#endif
 	//delay period
 	while(period_ms){
