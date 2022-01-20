@@ -292,6 +292,7 @@ nrf_err_t nRF_SendData(const uint8_t* data, const uint8_t len, nrf_Response_t* n
     if (!nRF_real_address_is_set()) {
         return nRF_ERR_ADDR_NOT_FOUND;
     }
+	DEBUG_LOG("send data adr %d %d %d %d %d\r", real_address.adr[0], real_address.adr[1], real_address.adr[2], real_address.adr[3], real_address.adr[4]);
     return send(real_address.adr, data, len, nRF_Resp);
 }
 
