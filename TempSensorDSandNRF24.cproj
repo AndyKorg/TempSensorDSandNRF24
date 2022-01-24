@@ -157,6 +157,12 @@
     <Compile Include="InternalTemp.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="MHZ19.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="MHZ19.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="nRF24L01P Reg.h">
       <SubType>compile</SubType>
     </Compile>

@@ -1,5 +1,6 @@
 /*
 \brief timers not used!
+delays are used - pay attention to work with interrupts in other modules!
  */ 
 
 

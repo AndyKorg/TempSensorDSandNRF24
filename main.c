@@ -28,9 +28,11 @@
 #include "ds18b20.h"
 #elif SENSOR_TYPE == DEVICE_TYPE_INTER_TEMPR
 #include "InternalTemp.h"
+#elif SENSOR_TYPE == DEVICE_TYPE_MH_Z19
+#include "MHZ19.h"
 #endif
 
-#ifdef DEBUG
+#ifdef CONSOLE_DEBUG
 #include "usart.h"
 #include <stdio.h>
 #endif
@@ -72,7 +74,7 @@ ISR(BUTTON_INT_VECT)
 	}
 }
 
-#ifdef DEBUG
+#ifdef CONSOLE_DEBUG
 bool console_cmd(cmd_t cmd)
 {
 	return true;
@@ -121,9 +123,11 @@ int main(void)
 	//	_PROTECTED_WRITE(CLKCTRL.MCLKCTRLB, CLKCTRL_PEN_bm);
 
 	uint8_t attempt = ATTEMPT_SEND_MAX;
-	uint16_t Tempr;
+	uint16_t SensorValue;
 
-	#ifdef DEBUG
+PORTB.DIRSET = PIN4_bm;
+
+	#ifdef CONSOLE_DEBUG
 	debugPortIni();
 	debugBoth();
 	usart_init(console_cmd);
@@ -150,14 +154,17 @@ int main(void)
 		if (mode == nrf_send_mode) { //send data to PRX
 			uint8_t buf[4];
 			#if SENSOR_TYPE == DEVICE_TYPE_DS18B20
-			Tempr = GetTemperDS18b20(ATTEMPT_READ_SENSOR);
+			SensorValue = GetTemperDS18b20(ATTEMPT_READ_SENSOR);
 			#elif SENSOR_TYPE == DEVICE_TYPE_INTER_TEMPR
-			Tempr = GetTemperature(ATTEMPT_READ_SENSOR);
+			SensorValue = GetTemperature(ATTEMPT_READ_SENSOR);
+			#elif SENSOR_TYPE == DEVICE_TYPE_MH_Z19
+			SensorValue = GetCO2_MHZ19(ATTEMPT_READ_SENSOR);
 			#endif
 			buf[0] = SENSOR_TYPE;
 			buf[1] = 0;
-			buf[2] = (uint8_t)(Tempr >> 8);
-			buf[3] = (uint8_t)Tempr;
+			buf[2] = (uint8_t)(SensorValue >> 8);
+			buf[3] = (uint8_t)SensorValue;
+			DEBUG_LOG("t= %04x\r", SensorValue);
 			nrf_err_t res_send = nRF_SendData(buf, 4, &nRF_Answer);
 			switch (res_send) {
 				case nRF_OK:

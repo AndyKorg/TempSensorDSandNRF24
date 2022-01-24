@@ -32,5 +32,5 @@ uint16_t GetTemperature(uint8_t attempt){
 	temp *= sigrow_gain; // Result might overflow 16 bit variable (10bit+8bit)
 	temp += 0x80; // Add 1/2 to get correct rounding on division below
 	temp >>= 8; // Divide result to get Kelvin
-	return temp-273;
+	return (temp-273)<<4; //convert to format ds18b20
 }

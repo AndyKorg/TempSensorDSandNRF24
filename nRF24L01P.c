@@ -9,7 +9,7 @@ The third byte code of the controlling microcontroller
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef DEBUG
+#ifdef CONSOLE_DEBUG
 #include "usart.h"
 #include <stdio.h>
 #endif

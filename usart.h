@@ -25,6 +25,8 @@ typedef struct
 
 typedef bool (*usart_cmd_cb)(cmd_t cmd);
 bool usart_init(usart_cmd_cb func);
+#ifdef CONSOLE_DEBUG
 bool usart_is_busy(void);
+#endif
 
 #endif /* USARTH_H_ */

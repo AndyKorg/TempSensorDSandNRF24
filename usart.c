@@ -25,13 +25,13 @@ _FDEV_SETUP_WRITE
 
 static bool usart_state_set(bool *value){
 	static bool busy = false;
+	bool i_state = isr_state();
+	cli();
 	if (value){
-		bool i_state = isr_state();
-		cli();
 		busy = *value;
-		if (i_state){
-			sei();
-		}
+	}
+	if (i_state){
+		sei();
 	}
 	return busy;
 }
@@ -39,6 +39,7 @@ static bool usart_state_set(bool *value){
 #define usart_busy()	do {bool busy = true; usart_state_set(&busy);} while (0)
 #define usart_free()	do {bool busy = false; usart_state_set(&busy);} while (0)
 
+#if (SENSOR_TYPE != DEVICE_TYPE_MH_Z19)
 ISR(USART0_TXC_vect){
 	if (FIFO_IS_EMPTY(txBuf)){
 		usart_free();
@@ -92,6 +93,7 @@ ISR(USART0_RXC_vect){
 	}
 	posCmd++;
 }
+#endif
 
 static int my_putchar(char c, FILE *stream){
 	USART0.CTRLA &= ~USART_DREIE_bm;
@@ -103,9 +105,11 @@ static int my_putchar(char c, FILE *stream){
 	return 0;
 }
 
+#ifdef CONSOLE_DEBUG
 bool usart_is_busy(void){
 	return usart_state_set(NULL);
 }
+#endif
 
 bool usart_init(usart_cmd_cb func){
 	func_cb = func;
