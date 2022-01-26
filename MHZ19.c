@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "MHZ19.h"
 #include "HAL.h"
+#include "sleep_rtc.h"
 
 
 #define MHZ19_BAUD	9600
@@ -21,6 +22,7 @@ const PROGMEM uint8_t answe_cmd[] = MHZ19_ANSWER;
 #define MHZ19_ANSWER_LEN		(sizeof(answe_cmd)/sizeof(uint8_t))
 #define MHZ19_ANSWER_HIGHT_NUM	MHZ19_READ_CMD_START+2
 #define MHZ19_ANSWER_LOW_NUM	MHZ19_READ_CMD_START+3
+#define MHZ19_WARMING_UP_S		5//(3*60) //three minute warmin up
 
 static bool usart_state_set(bool *value){
 	static bool busy = false;
@@ -35,7 +37,21 @@ static bool usart_state_set(bool *value){
 	return busy;
 }
 
-#define usart_busy()	do {bool busy = true; usart_state_set(&busy); timeout_start();} while (0)
+static bool timeout_state(bool *value){
+	static bool timeout = false;
+	bool i_state = isr_state();
+	cli();
+	if (value){
+		timeout = *value;
+	}
+	if (i_state){
+		sei();
+	}
+	return timeout;
+}
+
+#define timeout_clear()	do {bool clear = false; timeout_state(&clear);} while (0)
+#define usart_busy()	do {bool busy = true; usart_state_set(&busy); } while (0)
 #define usart_free()	do {bool busy = false; usart_state_set(&busy); timeout_stop();} while (0)
 #define usart_is_free()	(!usart_state_set(NULL))
 
@@ -57,22 +73,10 @@ static uint16_t gas_value(uint16_t *value){
 }
 
 #if (SENSOR_TYPE == DEVICE_TYPE_MH_Z19)
-ISR(TCB0_INT_vect){
-		PORTB.OUTTGL = PIN4_bm;
-		TIMEOUT_TIMER.INTFLAGS = TIMEOUT_FLAG;
-		TIMEOUT_TIMER.CNT = 0;
-		return;
-
-	static uint8_t count = 10;
-	count--;
-	if (!count){
-		uint16_t result = 0;
-		gas_value(&result);
-		usart_free();
-		PORTB.OUTTGL = PIN4_bm;
-		return;
-	}
-	TIMEOUT_TIMER.INTFLAGS = TIMEOUT_FLAG;
+void timeout_answer(void){
+	bool timeout = true;
+	timeout_state(&timeout);
+	PORTB.OUTTGL = PIN4_bm;
 }
 
 ISR(USART0_DRE_vect){
@@ -84,14 +88,14 @@ ISR(USART0_DRE_vect){
 		return;
 	}
 	cmd_count = MHZ19_READ_CMD_START;
-	USART0.CTRLA &= ~USART_DREIE_bm;
+	USART0.CTRLA &= ~USART_DREIE_bm;//end command
 }
 
 ISR(USART0_RXC_vect){
 	static uint8_t posCmd = MHZ19_READ_CMD_START, checksum = 0;
 	uint8_t data = USART0.RXDATAL;
 	static uint16_t result = 0;
-	
+
 	if (posCmd < MHZ19_ANSWER_LEN){
 		if (data != pgm_read_byte(&answe_cmd[posCmd])){
 			posCmd = MHZ19_READ_CMD_START;
@@ -112,6 +116,7 @@ ISR(USART0_RXC_vect){
 		}
 		posCmd = MHZ19_READ_CMD_START;
 		checksum = 0;
+		usart_free();
 		return;
 	}
 	if (posCmd){
@@ -121,7 +126,7 @@ ISR(USART0_RXC_vect){
 }
 #endif
 
-uint16_t GetCO2_MHZ19(uint8_t attempt){
+bool MHZ19_ready(uint8_t attempt){
 	static bool already_init = false;
 	
 	if (!already_init){
@@ -130,14 +135,36 @@ uint16_t GetCO2_MHZ19(uint8_t attempt){
 		USART0.CTRLB |= USART_TXEN_bm | USART_RXEN_bm;
 		USART0.CTRLA = USART_RXCIE_bm;
 		mhz19_PortInit();
-		//timeout timer set
-		timeout_timer_init();
 		already_init = true;
-		PORTB.OUTTGL = PIN4_bm;
+		PORTB.OUTTGL = PIN4_bm;	//DEBUG!
 	}
 	if (usart_is_free()){
+		//timeout timer set
+		mhz19_power_on();
+		timeout_start(10, timeout_answer);//first start
 		usart_busy();
-		USART0.CTRLA |= USART_DREIE_bm;	//start measure
+		//reading attempt
+		while (attempt){
+			usart_busy();
+			USART0.CTRLA |= USART_DREIE_bm;	//start read measure sensor
+			timeout_clear();
+			timeout_start(1, timeout_answer);
+			while(usart_is_busy() && (!timeout_state(NULL)));//white timeout or read measure sensor
+			if (usart_is_free()){
+				timeout_stop();
+				return true;
+			}
+			attempt--;
+		}
 	}
+	timeout_stop();
+	return false;
+}
+
+void MHZ19_stop(void){
+	mhz19_power_off();
+}
+
+uint16_t GetCO2_MHZ19(uint8_t attempt){
 	return gas_value(NULL);
 }

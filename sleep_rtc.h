@@ -35,4 +35,25 @@ void sleep_period_set(period_t period);
 */
 void sleep_period_stop(void);
 
+typedef void (*timeout_cb_t)(void);
+/*
+\brief start timeout timer in second
+func_cb - callback function. Called when the timeout expires. if not set, then the timeout is not triggered.
+Recall does not start any action until either the countdown is stopped or the timeout expires.
+*/
+void timeout_start(uint16_t sec, timeout_cb_t func_cb);
+/*
+\brief stop timeout timer
+Callback function not called!
+if the timer has not started, then no change is made.
+*/
+void timeout_stop(void);
+
+/*
+\brief reset timeout timer
+Callback function not called!
+if the timer has not started, then no change is made.
+*/
+void timeout_reset(void);
+
 #endif /* SLEEP_RTC_H_ */

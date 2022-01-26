@@ -72,7 +72,17 @@
 #define MHZ19_PORT_USART		PORTB
 #define MHZ19_PORT_TXD_PIN		PIN2_bm
 #define MHZ19_PORT_RXD_PIN		PIN3_bm
-#define mhz19_PortInit()		do {MHZ19_PORT_USART.DIRSET = MHZ19_PORT_TXD_PIN; MHZ19_PORT_USART.DIRCLR = MHZ19_PORT_RXD_PIN;} while (0)
+#define MHZ19_PORT_POWER		PORTC
+#define MHZ19_PIN_POWER			PIN1_bm
+#define mhz19_power_off()		do {MHZ19_PORT_POWER.OUTSET = MHZ19_PIN_POWER;} while (0)
+#define mhz19_power_on()		do {MHZ19_PORT_POWER.OUTCLR = MHZ19_PIN_POWER;} while (0)
+#define mhz19_PortInit()		do {\
+	MHZ19_PORT_USART.DIRSET = MHZ19_PORT_TXD_PIN; \
+	MHZ19_PORT_USART.DIRCLR = MHZ19_PORT_RXD_PIN;\
+	MHZ19_PORT_USART.PIN3CTRL = PORT_PULLUPEN_bm;\
+	MHZ19_PORT_POWER.DIRSET = MHZ19_PIN_POWER;\
+	mhz19_power_on();\
+	} while (0)
 
 //------------------ nRF24L01+  -----------------------------------
 //this not tested! #define nRF_SPI_SOFT							//comment out if using hard SPI
@@ -114,22 +124,6 @@
 #define nRF_EEPROM				0				//offset for address and address registration status
 
 //------------------ TIMER -----------------------------------
-#define SLEEP_TIMER				RTC
-//timeout timer for MH-Z19 ----------------------------
-#define TIMEOUT_PERIOD_MS		35UL			//35 ms maximum at 20 MHz/6 - frequency prescaler/2 counter prescaler for counter type B
-#define TIMEOUT_TIMER			TCB0
-#define TIMEOUT_ISR				TCB0_INT_vect
-#define TIMEOUT_FLAG			TCB_CAPT_bm
-#define	TIMEOUT_DEVIDER  		((uint16_t)(F_CPU/(2UL*(1000/TIMEOUT_PERIOD_MS))))
-#define TIMEOUT_CTRLA_INIT()	do {TIMEOUT_TIMER.CTRLA = TCB_CLKSEL_CLKDIV2_gc | TCB_ENABLE_bm;} while (0) //prescaller is set!
-#define timeout_start()			do {TIMEOUT_CTRLA_INIT(); TIMEOUT_TIMER.CNT = 0; TIMEOUT_TIMER.INTCTRL = TIMEOUT_FLAG;} while(0)
-#define timeout_reset()			do {TIMEOUT_TIMER.CNT = 0; }while(0)
-#define timeout_stop()			do {TIMEOUT_TIMER.INTCTRL &= ~TIMEOUT_FLAG; TIMEOUT_TIMER.CTRLA &= ~TCB_ENABLE_bm;}while(0)
-
-//Periodic mode, interrapt enable. T
-#define timeout_timer_init()	do {\
-	TIMEOUT_TIMER.CTRLB = TCB_CNTMODE_INT_gc;\
-	TIMEOUT_TIMER.CCMP = TIMEOUT_DEVIDER;\
-} while (0)
+#define SLEEP_TIMER				RTC				//sleep and timeout timer
 
 #endif /* HAL_H_ */

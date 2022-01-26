@@ -94,9 +94,11 @@ inline void pin_off_unused(void)
 
 	PORTB.PIN0CTRL = PORT_ISC_INPUT_DISABLE_gc; //SDA
 	PORTB.PIN1CTRL = PORT_ISC_INPUT_DISABLE_gc; //SCL
+	#if SENSOR_TYPE != DEVICE_TYPE_MH_Z19s
 	PORTB.PIN2CTRL = PORT_ISC_INPUT_DISABLE_gc; //TXD
 
 	PORTB.PIN3CTRL = PORT_ISC_INPUT_DISABLE_gc; //RXD
+	#endif
 	#if SENSOR_TYPE != DEVICE_TYPE_DS18B20
 	PORTB.PIN4CTRL = PORT_ISC_INPUT_DISABLE_gc; //1-wire
 	#endif
@@ -117,15 +119,15 @@ inline void pin_off_unused(void)
 	PORTC.PIN7CTRL = PORT_ISC_INPUT_DISABLE_gc; //no pin in MK
 }
 
+#include <util/delay.h>
 int main(void)
 {
 	//	#include <avr/xmega.h>
 	//	_PROTECTED_WRITE(CLKCTRL.MCLKCTRLB, CLKCTRL_PEN_bm);
 
+PORTB.DIRSET = PIN4_bm;
 	uint8_t attempt = ATTEMPT_SEND_MAX;
 	uint16_t SensorValue;
-
-PORTB.DIRSET = PIN4_bm;
 
 	#ifdef CONSOLE_DEBUG
 	debugPortIni();
@@ -158,7 +160,10 @@ PORTB.DIRSET = PIN4_bm;
 			#elif SENSOR_TYPE == DEVICE_TYPE_INTER_TEMPR
 			SensorValue = GetTemperature(ATTEMPT_READ_SENSOR);
 			#elif SENSOR_TYPE == DEVICE_TYPE_MH_Z19
-			SensorValue = GetCO2_MHZ19(ATTEMPT_READ_SENSOR);
+			SensorValue = 0;
+			if (MHZ19_ready(ATTEMPT_READ_SENSOR)){
+				SensorValue = GetCO2_MHZ19(ATTEMPT_READ_SENSOR);
+			}
 			#endif
 			buf[0] = SENSOR_TYPE;
 			buf[1] = 0;
@@ -176,6 +181,11 @@ PORTB.DIRSET = PIN4_bm;
 				}
 				DEBUG_LOG("send OK sleep %d\r", period.value);
 				allow_press_button();
+				#if SENSOR_TYPE == DEVICE_TYPE_MH_Z19
+				if ((period.dim = dd_Min) && (period.value < 30)){	//if the sleep period is too long, the CO2 sensor will turn off
+					MHZ19_stop();	
+				}
+				#endif
 				sleep_period_set(period);
 				break;
 				case nRF_ERR_NO_ANSWER: //PRX not answer, we will check there are attempts, if there are we will try, if not then we sleep.
@@ -196,13 +206,21 @@ PORTB.DIRSET = PIN4_bm;
 				}
 				case nRF_ERR_NO_MODULE: //no RF module, don't wake up
 				DEBUG_LOG("RF module not responce! halt\r");
-				while (1)
-				halt_sleep(WAKE_UP_OFF);
+				while (1){
+					#if SENSOR_TYPE == DEVICE_TYPE_MH_Z19
+					MHZ19_stop();
+					#endif
+					halt_sleep(WAKE_UP_OFF);
+				}
 				break;
 				case nRF_ERR_ADDR_NOT_FOUND: //receiver address not set. fall asleep before pressing the button.
 				DEBUG_LOG("address not set! halt\r");
-				while (mode == nrf_send_mode)
-				halt_sleep(WAKE_UP_ON);
+				while (mode == nrf_send_mode){
+					#if SENSOR_TYPE == DEVICE_TYPE_MH_Z19
+					MHZ19_stop();
+					#endif
+					halt_sleep(WAKE_UP_ON);
+				}
 				break;
 				default:
 				break;

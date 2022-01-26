@@ -5,6 +5,7 @@ Always includes interrupts!
 
 #include <avr/sleep.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "sleep_rtc.h"
 
 #ifdef CONSOLE_DEBUG
@@ -59,6 +60,7 @@ static const period_fix_t period_fix_ms[] = {
 //the sleep period above this value is observed inaccurately and in the power-down mode
 
 static volatile bool sleep_stop;	//variable setting in interrupt!
+static volatile timeout_cb_t timeout_func = NULL;
 
 void sleep_period_stop(void){
 	sleep_stop = true;
@@ -69,6 +71,12 @@ ISR(RTC_PIT_vect){
 }
 
 ISR(RTC_CNT_vect){
+	if (timeout_func){
+		timeout_func();
+		timeout_func = NULL;
+		SLEEP_TIMER.CTRLA = 0;//stop RTC
+		return;
+	}
 	SLEEP_TIMER.INTFLAGS = RTC_CMP_bm | RTC_OVF_bm;
 }
 
@@ -166,4 +174,26 @@ void sleep_period_set(period_t period){
 			count_sleep--;
 		}
 	}
+}
+
+void timeout_start(uint16_t sec, timeout_cb_t func_cb){
+	if (timeout_func) return;
+	if (!func_cb) return;
+	timeout_func = func_cb;
+	while((RTC.STATUS & RTC_CTRLBUSY_bm) || (SLEEP_TIMER.PITSTATUS & RTC_CTRLBUSY_bm));	//Wait for all register to be synchronized
+	SLEEP_TIMER.CTRLA = RTC_PRESCALER_DIV1024_gc | RTC_RTCEN_bm;
+	SLEEP_TIMER.CNT = 0;
+	SLEEP_TIMER.PER = sec;
+	SLEEP_TIMER.INTCTRL = RTC_OVF_bm;		//interrupt on
+}
+
+void timeout_stop(void){
+	if (!timeout_func) return;
+	timeout_func = NULL;
+	SLEEP_TIMER.CTRLA = 0;//stop RTC
+}
+
+void timeout_reset(void){
+	if (!timeout_func) return;
+	SLEEP_TIMER.CNT = 0;//reset RTC
 }
