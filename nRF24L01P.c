@@ -149,7 +149,7 @@ bool nRF_real_address_is_set(void)
     for (tmp = 0; tmp < ADDR_LEN; tmp++) {
         adr_or |= *(real_address.adr + tmp);
     }
-    return adr_or & real_address.state;
+    return (adr_or != 0) && (real_address.state == stReal);
 }
 /*
 \brief Initializes the nRF24L01 interface and transmits Data over the nRF_PIPE channel. High byte forward.
@@ -204,9 +204,9 @@ nrf_err_t send(const uint8_t* adr, const uint8_t* data, const uint8_t len, nrf_R
     } while ((tmp & nRF_IRQ_MASK) == 0); //Either the end of the exchange or an exchange error is expected
     nRF_STOP(); //stop transfer
 
-    nrf_err_t Ret = nRF_ERR_NO_ANSWER;
     Buf[0] = tmp; //reset state
     nRF_cmd_Write(nRF_WR_REG(nRF_STATUS), 1, Buf);
+    nrf_err_t Ret = nRF_ERR_NO_ANSWER;
     if (!nRF_TX_ERROR(tmp)) { //error not found
         if (tmp & (1 << nRF_RX_DR)) { //Принят ответ от хоста. TODO:Если ответа нет, то нужно переспросить
             nRF_SELECT(); //read length answer

@@ -119,7 +119,6 @@ inline void pin_off_unused(void)
 	PORTC.PIN7CTRL = PORT_ISC_INPUT_DISABLE_gc; //no pin in MK
 }
 
-#include <util/delay.h>
 int main(void)
 {
 	//	#include <avr/xmega.h>
