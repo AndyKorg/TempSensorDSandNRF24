@@ -57,6 +57,9 @@
 #define nRF_SETUP_AW	0x03						//SETUP_AW - Установка длины адреса, для всех пипов. со 2 по 7 биты должны быть всегда 0
 #define nRF_AW1			1							//Комбинации: 00 - запрещена, 01 - 3 байта, 10 - 4 байта, 11 - байт
 #define nRF_AW0			0
+#define nRF_ADR_PIPE_LEN_3_BYTE ((0<<nRF_AW1) | (1<<nRF_AW0))
+#define nRF_ADR_PIPE_LEN_4_BYTE ((1<<nRF_AW1) | (0<<nRF_AW0))
+#define nRF_ADR_PIPE_LEN_5_BYTE ((1<<nRF_AW1) | (1<<nRF_AW0))
 
 #define nRF_SETUP_RETR	0x04						//SETUP_RETR - Настройка автоповтора передачи
 #define nRF_ARD3		7							//с 7-ого по 4-й бит задержка перед повтором

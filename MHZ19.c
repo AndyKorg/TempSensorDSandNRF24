@@ -55,9 +55,11 @@ static bool timeout_state(bool *value){
 #define usart_free()	do {bool busy = false; usart_state_set(&busy); timeout_stop();} while (0)
 #define usart_is_free()	(!usart_state_set(NULL))
 
+#if (SENSOR_TYPE == DEVICE_TYPE_MH_Z19)
 bool usart_is_busy(void){
 	return usart_state_set(NULL);
 }
+#endif
 
 static uint16_t gas_value(uint16_t *value){
 	static uint16_t gas_concentrat = 0;
@@ -72,13 +74,13 @@ static uint16_t gas_value(uint16_t *value){
 	return gas_concentrat;
 }
 
-#if (SENSOR_TYPE == DEVICE_TYPE_MH_Z19)
 void timeout_answer(void){
 	bool timeout = true;
 	timeout_state(&timeout);
 	PORTB.OUTTGL = PIN4_bm;
 }
 
+#if (SENSOR_TYPE == DEVICE_TYPE_MH_Z19)
 ISR(USART0_DRE_vect){
 	static uint8_t cmd_count = MHZ19_READ_CMD_START;//0 bytes are transmitted at the start of the measurement
 	if (cmd_count != MHZ19_READ_CMD_LEN){

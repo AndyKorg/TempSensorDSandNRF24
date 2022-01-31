@@ -11,9 +11,10 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include "HAL.h"
-#include "nRF24L01P Reg.h"
+#include "nRF24L01P_Reg.h"
 
 #define nRF_CHANNEL				2				//Number RF chanel
+#define nRF_PIPE_ADR_LEN		nRF_ADR_PIPE_LEN_5_BYTE
 #define nRF_TYPE_SENSOR			SENSOR_TYPE		//type sensor
 
 typedef struct {								//answer PRX

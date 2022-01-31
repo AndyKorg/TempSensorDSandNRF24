@@ -163,7 +163,7 @@
     <Compile Include="MHZ19.h">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="nRF24L01P Reg.h">
+    <Compile Include="nRF24L01P_Reg.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="nRF24L01P.c">

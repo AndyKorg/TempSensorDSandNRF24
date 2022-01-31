@@ -15,7 +15,7 @@
 
 //------------------ select type sensor  -----------------------------------
 //#define SENSOR_TYPE		DEVICE_TYPE_DS18B20
-//#define SENSOR_TYPE		DEVICE_TYPE_INTER_TEMPR
+//#define SENSOR_TYPE		DEVICE_TYPE_INTER_TEMPR		//temperature sensor into chip
 #define SENSOR_TYPE		DEVICE_TYPE_MH_Z19
 
 #define CONSOLE_DEBUG

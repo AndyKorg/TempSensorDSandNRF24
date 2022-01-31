@@ -17,8 +17,10 @@ The third byte code of the controlling microcontroller
 #include "nRF24L01P.h"
 #include "sleep_rtc.h"
 
-#define ADDR_LEN 5 //address lenght device, while fixed
 
+#if (nRF_PIPE_ADR_LEN == nRF_ADR_PIPE_LEN_5_BYTE)
+#define ADDR_LEN 5 //address lenght device, while fixed
+#endif
 #define REG_ATTEMPT_MAX 20 //maximum number attempt registration
 #define REG_ADDRESS                  \
     {                                \
@@ -190,8 +192,16 @@ nrf_err_t send(const uint8_t* adr, const uint8_t* data, const uint8_t len, nrf_R
     nRF_cmd_Write(nRF_WR_REG(nRF_EN_RXADDR), 1, Buf); //enable pipe 0 recive
 
     //the address of channel 0 for receiving the response is the same as the address of the transmitting channel
-    nRF_cmd_Write(nRF_WR_REG(nRF_TX_ADDR), ADDR_LEN, adr);
-    nRF_cmd_Write(nRF_WR_REG(nRF_RX_ADDR_P0), ADDR_LEN, adr);
+	//LCB first! 
+	#if (nRF_PIPE_ADR_LEN != nRF_ADR_PIPE_LEN_5_BYTE)
+	#error "Only nRF_ADR_PIPE_LEN_5_BYTE is supported!"
+	#else
+    Buf[0] = nRF_PIPE_ADR_LEN;
+    nRF_cmd_Write(nRF_WR_REG(nRF_SETUP_AW), 1, Buf);
+	uint8_t adr_buf[ADDR_LEN] = {*(adr+4), *(adr+3), *(adr+2), *(adr+1), *(adr+0)};
+	#endif
+    nRF_cmd_Write(nRF_WR_REG(nRF_TX_ADDR), ADDR_LEN, adr_buf);
+    nRF_cmd_Write(nRF_WR_REG(nRF_RX_ADDR_P0), ADDR_LEN, adr_buf);
     nRF_cmd_Write(nRF_FLUSH_TX, 0, NULL); //Clear FIFO TX buffer
     nRF_cmd_Write(nRF_W_TX_PAYLOAD, len, data);
 
