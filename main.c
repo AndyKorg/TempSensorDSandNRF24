@@ -175,13 +175,13 @@ PORTB.DIRSET = PIN4_bm;
 				period.dim = dd_Min;
 				period.value = SLEEP_PERIOD_LONG_M; //white long delay if answer not correct TODO:Добавить проверку типа команды и датчика
 				if (nRF_Answer.Len == DEVICE_ANSWER_LEN) { //response in the measurement transfer mode, we check the correctness of the response and set the sleep period depending on the response
-					period.value = *((uint16_t*)(nRF_Answer.Data + DEVICE_ANSWER_PERIOD_OFFSET));
+					period.value = (uint16_t)((*(nRF_Answer.Data + DEVICE_ANSWER_PERIOD_OFFSET))<<8)+(*(nRF_Answer.Data + DEVICE_ANSWER_PERIOD_OFFSET+1));
 					attempt = ATTEMPT_SEND_MAX;
 				}
 				DEBUG_LOG("send OK sleep %d\r", period.value);
 				allow_press_button();
 				#if SENSOR_TYPE == DEVICE_TYPE_MH_Z19
-				if ((period.dim = dd_Min) && (period.value < 30)){	//if the sleep period is too long, the CO2 sensor will turn off
+				if ((period.dim == dd_Min) && (period.value < 30)){	//if the sleep period is too long, the CO2 sensor will turn off
 					MHZ19_stop();	
 				}
 				#endif
