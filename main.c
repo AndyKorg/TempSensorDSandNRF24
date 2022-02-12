@@ -181,7 +181,7 @@ PORTB.DIRSET = PIN4_bm;
 				DEBUG_LOG("send OK sleep %d\r", period.value);
 				allow_press_button();
 				#if SENSOR_TYPE == DEVICE_TYPE_MH_Z19
-				if ((period.dim == dd_Min) && (period.value < 30)){	//if the sleep period is too long, the CO2 sensor will turn off
+				if ((period.dim == dd_Min) && (period.value > 30)){	//if the sleep period is too long, the CO2 sensor will turn off
 					MHZ19_stop();	
 				}
 				#endif
@@ -218,6 +218,7 @@ PORTB.DIRSET = PIN4_bm;
 					#if SENSOR_TYPE == DEVICE_TYPE_MH_Z19
 					MHZ19_stop();
 					#endif
+					allow_press_button();
 					halt_sleep(WAKE_UP_ON);
 				}
 				break;
