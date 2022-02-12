@@ -15,16 +15,20 @@
 
 //------------------ select type sensor  -----------------------------------
 //#define SENSOR_TYPE		DEVICE_TYPE_DS18B20
-//#define SENSOR_TYPE		DEVICE_TYPE_INTER_TEMPR		//temperature sensor into chip
-#define SENSOR_TYPE		DEVICE_TYPE_MH_Z19
+#define SENSOR_TYPE		DEVICE_TYPE_INTER_TEMPR		//temperature sensor into chip
+//#define SENSOR_TYPE		DEVICE_TYPE_MH_Z19
 
-#define CONSOLE_DEBUG
+//------------------ turn off console output  -----------------------------------
+//#define CONSOLE_DEBUG
 #if SENSOR_TYPE == DEVICE_TYPE_MH_Z19
 #undef CONSOLE_DEBUG
 #endif
 
 
 #ifdef CONSOLE_DEBUG
+#include <stdio.h>
+#include "usart.h"
+
 #define DEBUG_PORT	PORTC
 #define DEBUG_PIN	PIN5_bm
 

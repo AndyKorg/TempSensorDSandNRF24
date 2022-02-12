@@ -9,14 +9,8 @@ The third byte code of the controlling microcontroller
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef CONSOLE_DEBUG
-#include "usart.h"
-#include <stdio.h>
-#endif
-
 #include "nRF24L01P.h"
 #include "sleep_rtc.h"
-
 
 #if (nRF_PIPE_ADR_LEN == nRF_ADR_PIPE_LEN_5_BYTE)
 #define ADDR_LEN 5 //address lenght device, while fixed
@@ -192,14 +186,14 @@ nrf_err_t send(const uint8_t* adr, const uint8_t* data, const uint8_t len, nrf_R
     nRF_cmd_Write(nRF_WR_REG(nRF_EN_RXADDR), 1, Buf); //enable pipe 0 recive
 
     //the address of channel 0 for receiving the response is the same as the address of the transmitting channel
-	//LCB first! 
-	#if (nRF_PIPE_ADR_LEN != nRF_ADR_PIPE_LEN_5_BYTE)
-	#error "Only nRF_ADR_PIPE_LEN_5_BYTE is supported!"
-	#else
+    //LCB first!
+#if (nRF_PIPE_ADR_LEN != nRF_ADR_PIPE_LEN_5_BYTE)
+#error "Only nRF_ADR_PIPE_LEN_5_BYTE is supported!"
+#else
     Buf[0] = nRF_PIPE_ADR_LEN;
     nRF_cmd_Write(nRF_WR_REG(nRF_SETUP_AW), 1, Buf);
-	uint8_t adr_buf[ADDR_LEN] = {*(adr+4), *(adr+3), *(adr+2), *(adr+1), *(adr+0)};
-	#endif
+    uint8_t adr_buf[ADDR_LEN] = { *(adr + 4), *(adr + 3), *(adr + 2), *(adr + 1), *(adr + 0) };
+#endif
     nRF_cmd_Write(nRF_WR_REG(nRF_TX_ADDR), ADDR_LEN, adr_buf);
     nRF_cmd_Write(nRF_WR_REG(nRF_RX_ADDR_P0), ADDR_LEN, adr_buf);
     nRF_cmd_Write(nRF_FLUSH_TX, 0, NULL); //Clear FIFO TX buffer
@@ -270,20 +264,20 @@ nrf_err_t nRF_TransmitReg(nrf_Response_t* nRF_Resp)
                     //white next query from PTX
                     reg_buf[PTX_REG_QUERY_NUM_BYTE] = PTX_REG_MODE_QUERY_1;
                     real_address.state = stProcess;
-					DEBUG_LOG("first query ok\r");
+                    DEBUG_LOG("first query ok\r");
                 } else if ((*(nRF_Resp->Data + PTX_REG_TYPE_BYTE) == nRF_TYPE_SENSOR) && (*(nRF_Resp->Data + PTX_REG_QUERY_NUM_BYTE) == PTX_REG_MODE_QUERY_1)) {
                     //answer address sensor
                     memcpy(real_address.adr, nRF_Resp->Data + PTX_REG_ADR_START_BYTE, ADDR_LEN);
                     real_address.state = stReal;
                     eeprom_write_block(&real_address, (void*)nRF_EEPROM, sizeof(address_t));
-					DEBUG_LOG("adr set ok\r");
+                    DEBUG_LOG("adr set ok\r");
                     return nRF_OK;
                 } else if (*(nRF_Resp->Data + PTX_REG_TYPE_BYTE) == PRX_NO_REG_MODE) {
-					DEBUG_LOG("next reg attempt %d\r", attempt);
+                    DEBUG_LOG("next reg attempt %d\r", attempt);
                     period_t sleep_tmp;
-					sleep_tmp.dim = dd_Sec;
-					sleep_tmp.value = 1;
-					sleep_period_set(sleep_tmp);
+                    sleep_tmp.dim = dd_Sec;
+                    sleep_tmp.value = 1;
+                    sleep_period_set(sleep_tmp);
                 }
             }
         }
@@ -302,7 +296,7 @@ nrf_err_t nRF_SendData(const uint8_t* data, const uint8_t len, nrf_Response_t* n
     if (!nRF_real_address_is_set()) {
         return nRF_ERR_ADDR_NOT_FOUND;
     }
-	DEBUG_LOG("send data adr %d %d %d %d %d\r", real_address.adr[0], real_address.adr[1], real_address.adr[2], real_address.adr[3], real_address.adr[4]);
+    DEBUG_LOG("send data adr %d %d %d %d %d\r", real_address.adr[0], real_address.adr[1], real_address.adr[2], real_address.adr[3], real_address.adr[4]);
     return send(real_address.adr, data, len, nRF_Resp);
 }
 
